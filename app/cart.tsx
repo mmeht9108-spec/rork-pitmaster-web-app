@@ -83,19 +83,38 @@ export default function CartScreen() {
       const botToken = process.env.EXPO_PUBLIC_TELEGRAM_BOT_TOKEN;
       const chatId = process.env.EXPO_PUBLIC_TELEGRAM_CHAT_ID;
 
-      if (botToken && chatId) {
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: message,
-            parse_mode: 'Markdown',
-          }),
-        });
+      if (!botToken || !chatId) {
+        throw new Error('Missing Telegram envs');
+      }
+
+      console.log('Telegram send start', { chatId });
+
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: 'Markdown',
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Telegram send response', data);
+
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.description || 'Telegram send failed');
       }
     } catch (e) {
       console.log('Telegram send error:', e);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+      Alert.alert(
+        'Не удалось отправить заказ',
+        'Проверьте подключение и попробуйте ещё раз.'
+      );
+      return;
     }
 
     if (Platform.OS !== 'web') {
@@ -118,6 +137,7 @@ export default function CartScreen() {
         },
       ]
     );
+
   };
 
   if (items.length === 0) {
@@ -266,6 +286,7 @@ export default function CartScreen() {
           style={styles.checkoutButton}
           onPress={handleCheckout}
           activeOpacity={0.8}
+          testID="checkout-button"
         >
           <Text style={styles.checkoutButtonText}>Оформить заказ</Text>
         </TouchableOpacity>
