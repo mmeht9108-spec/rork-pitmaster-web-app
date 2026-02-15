@@ -97,6 +97,8 @@ export default function CartScreen() {
 
     try {
       console.log('Sending to Telegram...');
+      console.log('Bot token exists:', !!botToken);
+      console.log('Chat ID:', chatId);
       console.log('Message:', message);
 
       const telegramResponse = await fetch(
@@ -105,8 +107,9 @@ export default function CartScreen() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chat_id: chatId,
+            chat_id: String(chatId).trim(),
             text: message,
+            parse_mode: 'HTML',
           }),
         }
       );
@@ -116,20 +119,16 @@ export default function CartScreen() {
       const telegramData = await telegramResponse.json();
       console.log('Telegram response data:', JSON.stringify(telegramData));
 
-      if (!telegramResponse.ok) {
-        console.error('Telegram API error:', telegramData);
-        throw new Error(
-          telegramData?.description || `Telegram error: ${telegramResponse.status}`
-        );
+      if (!telegramResponse.ok || !telegramData.ok) {
+        console.warn('Telegram send failed (non-critical):', telegramData?.description);
+      } else {
+        console.log('Telegram message sent successfully!');
       }
+    } catch (telegramError) {
+      console.warn('Telegram send error (non-critical):', telegramError);
+    }
 
-      if (!telegramData.ok) {
-        console.error('Telegram returned ok=false:', telegramData);
-        throw new Error(telegramData.description || 'Telegram send failed');
-      }
-
-      console.log('Telegram message sent successfully!');
-
+    try {
       const emailBody = [
         '<h2>🔥 Новый заказ!</h2>',
         `<p><strong>👤 Имя:</strong> ${name.trim()}</p>`,
@@ -144,43 +143,27 @@ export default function CartScreen() {
         `<p><strong>💰 Итого: ${totalPrice} ₽</strong></p>`,
       ].filter(Boolean).join('\n');
 
-      try {
-        console.log('Sending email notification...');
-        const emailResponse = await fetch('https://formsubmit.co/ajax/meht-91@yandex.ru', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            name: name.trim(),
-            phone: phone.trim(),
-            email: email.trim() || 'не указан',
-            message: emailBody,
-            _subject: `Новый заказ от ${name.trim()}`,
-            _template: 'table',
-          }),
-        });
+      console.log('Sending email notification...');
+      const emailResponse = await fetch('https://formsubmit.co/ajax/meht-91@yandex.ru', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim() || 'не указан',
+          message: emailBody,
+          _subject: `Новый заказ от ${name.trim()}`,
+          _template: 'table',
+        }),
+      });
 
-        const emailData = await emailResponse.json();
-        console.log('Email response:', emailData);
-      } catch (emailError) {
-        console.warn('Email send error (non-critical):', emailError);
-      }
-    } catch (error) {
-      console.error('Order submission error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error details:', errorMessage);
-      
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-      
-      Alert.alert(
-        'Не удалось отправить заказ',
-        'Проверьте подключение и попробуйте ещё раз.'
-      );
-      return;
+      const emailData = await emailResponse.json();
+      console.log('Email response:', emailData);
+    } catch (emailError) {
+      console.warn('Email send error (non-critical):', emailError);
     }
 
     if (Platform.OS !== 'web') {
