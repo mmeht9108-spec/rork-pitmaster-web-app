@@ -7,7 +7,9 @@ export interface Product {
   image: string;
   category: string;
   isPopular?: boolean;
-  heatingTime?: string;
+  proteins: number;
+  fats: number;
+  carbs: number;
 }
 
 export interface CartItem {

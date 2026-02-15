@@ -10,7 +10,9 @@ export const products: Product[] = [
     image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80',
     category: 'Говядина',
     isPopular: true,
-    heatingTime: '10-15 мин',
+    proteins: 25,
+    fats: 18,
+    carbs: 0,
   },
   {
     id: '2',
@@ -21,7 +23,9 @@ export const products: Product[] = [
     image: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=800&q=80',
     category: 'Свинина',
     isPopular: true,
-    heatingTime: '12-15 мин',
+    proteins: 22,
+    fats: 24,
+    carbs: 3,
   },
   {
     id: '3',
@@ -32,7 +36,9 @@ export const products: Product[] = [
     image: 'https://cdn.stocksnap.io/img-thumbs/960w/black%20and%20white-dog_0CWZE3NWFS.jpg',
     category: 'Колбаски',
     isPopular: true,
-    heatingTime: '8-10 мин',
+    proteins: 18,
+    fats: 26,
+    carbs: 2,
   },
   {
     id: '4',
@@ -43,7 +49,9 @@ export const products: Product[] = [
     image: 'https://images.unsplash.com/photo-1590947132387-155cc02f3212?w=800&q=80',
     category: 'Говядина',
     isPopular: false,
-    heatingTime: '10-12 мин',
+    proteins: 24,
+    fats: 20,
+    carbs: 8,
   },
   {
     id: '5',
@@ -54,7 +62,9 @@ export const products: Product[] = [
     image: 'https://images.unsplash.com/photo-1623653387945-2fd25214f8fc?w=800&q=80',
     category: 'Свинина',
     isPopular: true,
-    heatingTime: '8-10 мин',
+    proteins: 26,
+    fats: 16,
+    carbs: 1,
   },
   {
     id: '6',
@@ -65,7 +75,9 @@ export const products: Product[] = [
     image: 'https://images.unsplash.com/photo-1558030006-450675393462?w=800&q=80',
     category: 'Говядина',
     isPopular: false,
-    heatingTime: '15-20 мин',
+    proteins: 28,
+    fats: 22,
+    carbs: 0,
   },
   {
     id: '7',
@@ -76,7 +88,9 @@ export const products: Product[] = [
     image: 'https://images.unsplash.com/photo-1608039755401-742074f0548d?w=800&q=80',
     category: 'Птица',
     isPopular: true,
-    heatingTime: '8-10 мин',
+    proteins: 20,
+    fats: 14,
+    carbs: 1,
   },
   {
     id: '8',
@@ -87,7 +101,9 @@ export const products: Product[] = [
     image: 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=800&q=80',
     category: 'Соусы',
     isPopular: false,
-    heatingTime: 'Не требует',
+    proteins: 1,
+    fats: 2,
+    carbs: 28,
   },
 ];
 

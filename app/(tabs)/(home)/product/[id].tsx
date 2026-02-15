@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Clock, Minus, Plus, ShoppingCart } from 'lucide-react-native';
+import { Minus, Plus, ShoppingCart } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { products } from '@/mocks/products';
@@ -74,12 +74,23 @@ export default function ProductDetailScreen() {
 
           <View style={styles.metaRow}>
             <Text style={styles.weight}>{product.weight}</Text>
-            {product.heatingTime && (
-              <View style={styles.heatingTime}>
-                <Clock size={14} color={Colors.textMuted} />
-                <Text style={styles.heatingTimeText}>{product.heatingTime}</Text>
-              </View>
-            )}
+          </View>
+
+          <View style={styles.nutriRow}>
+            <View style={styles.nutriItem}>
+              <Text style={styles.nutriValue}>{product.proteins}</Text>
+              <Text style={styles.nutriLabel}>Белки</Text>
+            </View>
+            <View style={styles.nutriDivider} />
+            <View style={styles.nutriItem}>
+              <Text style={styles.nutriValue}>{product.fats}</Text>
+              <Text style={styles.nutriLabel}>Жиры</Text>
+            </View>
+            <View style={styles.nutriDivider} />
+            <View style={styles.nutriItem}>
+              <Text style={styles.nutriValue}>{product.carbs}</Text>
+              <Text style={styles.nutriLabel}>Углеводы</Text>
+            </View>
           </View>
 
           <Text style={styles.description}>{product.description}</Text>
@@ -191,14 +202,33 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 15,
   },
-  heatingTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  nutriRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    marginBottom: 16,
   },
-  heatingTimeText: {
+  nutriItem: {
+    flex: 1,
+    alignItems: 'center' as const,
+  },
+  nutriValue: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '700' as const,
+    marginBottom: 2,
+  },
+  nutriLabel: {
     color: Colors.textMuted,
-    fontSize: 14,
+    fontSize: 12,
+  },
+  nutriDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.border,
   },
   description: {
     color: Colors.textSecondary,

@@ -71,6 +71,11 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
           {product.name}
         </Text>
         <Text style={styles.weight}>{product.weight}</Text>
+        <View style={styles.nutriRow}>
+          <Text style={styles.nutriLabel}>Б <Text style={styles.nutriValue}>{product.proteins}</Text></Text>
+          <Text style={styles.nutriLabel}>Ж <Text style={styles.nutriValue}>{product.fats}</Text></Text>
+          <Text style={styles.nutriLabel}>У <Text style={styles.nutriValue}>{product.carbs}</Text></Text>
+        </View>
         <View style={styles.footer}>
           <View style={styles.priceBlock}>
             <Text style={styles.price}>{product.price} ₽</Text>
@@ -159,7 +164,21 @@ const styles = StyleSheet.create({
   weight: {
     color: Colors.textMuted,
     fontSize: 12,
+    marginBottom: 4,
+  },
+  nutriRow: {
+    flexDirection: 'row' as const,
+    gap: 8,
     marginBottom: 8,
+  },
+  nutriLabel: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    fontWeight: '500' as const,
+  },
+  nutriValue: {
+    color: Colors.textSecondary,
+    fontWeight: '600' as const,
   },
   footer: {
     flexDirection: 'row',
