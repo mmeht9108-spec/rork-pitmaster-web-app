@@ -67,16 +67,16 @@ export default function CartScreen() {
     ).join('\n');
 
     const message = [
-      '🔥 *Новый заказ!*',
+      '🔥 Новый заказ!',
       '',
-      `👤 *Имя:* ${name.trim()}`,
-      `📞 *Телефон:* ${phone.trim()}`,
-      email.trim() ? `📧 *Email:* ${email.trim()}` : '',
+      `👤 Имя: ${name.trim()}`,
+      `📞 Телефон: ${phone.trim()}`,
+      email.trim() ? `📧 Email: ${email.trim()}` : '',
       '',
-      '📦 *Заказ:*',
+      '📦 Заказ:',
       orderLines,
       '',
-      `💰 *Итого: ${totalPrice} ₽*`,
+      `💰 Итого: ${totalPrice} ₽`,
     ].filter(Boolean).join('\n');
 
     try {
@@ -95,7 +95,6 @@ export default function CartScreen() {
         body: JSON.stringify({
           chat_id: chatId,
           text: message,
-          parse_mode: 'Markdown',
         }),
       });
 
