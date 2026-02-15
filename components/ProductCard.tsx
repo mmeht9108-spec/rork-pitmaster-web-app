@@ -8,7 +8,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { Flame, Plus } from 'lucide-react-native';
+import { Flame, Plus, Minus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Product } from '@/types/product';
 import Colors from '@/constants/colors';
@@ -23,14 +23,26 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, onPress }: ProductCardProps) {
-  const { addToCart, getItemQuantity } = useCart();
+  const { addToCart, getItemQuantity, updateQuantity } = useCart();
   const quantity = getItemQuantity(product.id);
 
   const handleAddToCart = () => {
+    console.log('ProductCard add to cart', { productId: product.id, quantityBefore: quantity });
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     addToCart(product);
+  };
+
+  const handleDecrease = () => {
+    console.log('ProductCard decrease quantity', { productId: product.id, quantityBefore: quantity });
+    if (quantity <= 0) {
+      return;
+    }
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    updateQuantity(product.id, quantity - 1);
   };
 
   return (
@@ -50,7 +62,7 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
         )}
         {quantity > 0 && (
           <View style={styles.quantityBadge}>
-            <Text style={styles.quantityText}>{quantity}</Text>
+            <Text style={styles.quantityText}>{quantity} шт.</Text>
           </View>
         )}
       </View>
@@ -60,14 +72,26 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
         </Text>
         <Text style={styles.weight}>{product.weight}</Text>
         <View style={styles.footer}>
-          <Text style={styles.price}>{product.price} ₽</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={handleAddToCart}
-            testID={`add-to-cart-${product.id}`}
-          >
-            <Plus size={18} color={Colors.text} />
-          </TouchableOpacity>
+          <View style={styles.priceBlock}>
+            <Text style={styles.price}>{product.price} ₽</Text>
+            {quantity > 0 && <Text style={styles.quantityLabel}>{quantity} шт.</Text>}
+          </View>
+          <View style={styles.controls}>
+            <TouchableOpacity
+              style={[styles.controlButton, quantity <= 0 ? styles.controlButtonDisabled : null]}
+              onPress={handleDecrease}
+              testID={`remove-from-cart-${product.id}`}
+            >
+              <Minus size={16} color={Colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={handleAddToCart}
+              testID={`add-to-cart-${product.id}`}
+            >
+              <Plus size={16} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -141,18 +165,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
+  },
+  priceBlock: {
+    gap: 4,
   },
   price: {
     color: Colors.text,
     fontSize: 16,
     fontWeight: '700' as const,
   },
-  addButton: {
+  quantityLabel: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  controlButton: {
     backgroundColor: Colors.primary,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  controlButtonDisabled: {
+    opacity: 0.5,
   },
 });
