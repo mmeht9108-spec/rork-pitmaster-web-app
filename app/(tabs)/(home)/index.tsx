@@ -82,7 +82,7 @@ export default function HomeScreen() {
               <Text style={styles.sectionTitle}>Популярное</Text>
               <TouchableOpacity
                 style={styles.seeAllButton}
-                onPress={() => router.push('/(tabs)/menu')}
+                onPress={() => router.push('/(tabs)/menu' as any)}
               >
                 <Text style={styles.seeAllText}>Все</Text>
                 <ChevronRight size={16} color={Colors.primary} />
