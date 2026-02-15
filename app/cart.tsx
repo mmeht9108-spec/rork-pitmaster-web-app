@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail } from 'lucide-react-native';
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, MapPin, Home, DoorOpen, MessageSquare } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useCart } from '@/contexts/CartContext';
@@ -25,6 +25,10 @@ export default function CartScreen() {
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState<string>('');
+  const [address, setAddress] = useState<string>('');
+  const [building, setBuilding] = useState<string>('');
+  const [apartment, setApartment] = useState<string>('');
+  const [comment, setComment] = useState<string>('');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
 
   const handleQuantityChange = (productId: string, delta: number, currentQty: number) => {
@@ -88,6 +92,10 @@ export default function CartScreen() {
       `👤 Имя: ${name.trim()}`,
       `📞 Телефон: ${phone.trim()}`,
       email.trim() ? `📧 Email: ${email.trim()}` : '',
+      address.trim() ? `📍 Адрес: ${address.trim()}` : '',
+      building.trim() ? `🏠 Дом: ${building.trim()}` : '',
+      apartment.trim() ? `🚪 Квартира: ${apartment.trim()}` : '',
+      comment.trim() ? `💬 Комментарий: ${comment.trim()}` : '',
       '',
       '📦 Заказ:',
       orderLines,
@@ -135,6 +143,10 @@ export default function CartScreen() {
         `<p><strong>👤 Имя:</strong> ${name.trim()}</p>`,
         `<p><strong>📞 Телефон:</strong> ${phone.trim()}</p>`,
         email.trim() ? `<p><strong>📧 Email:</strong> ${email.trim()}</p>` : '',
+        address.trim() ? `<p><strong>📍 Адрес:</strong> ${address.trim()}</p>` : '',
+        building.trim() ? `<p><strong>🏠 Дом:</strong> ${building.trim()}</p>` : '',
+        apartment.trim() ? `<p><strong>🚪 Квартира:</strong> ${apartment.trim()}</p>` : '',
+        comment.trim() ? `<p><strong>💬 Комментарий:</strong> ${comment.trim()}</p>` : '',
         '<h3>📦 Заказ:</h3>',
         '<ul>',
         ...items.map(item => 
@@ -181,6 +193,10 @@ export default function CartScreen() {
             setName('');
             setPhone('');
             setEmail('');
+            setAddress('');
+            setBuilding('');
+            setApartment('');
+            setComment('');
             setErrors({});
             router.back();
           },
@@ -321,6 +337,68 @@ export default function CartScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 testID="input-email"
+              />
+            </View>
+
+            <View style={styles.inputWrapper}>
+              <View style={styles.inputIcon}>
+                <MapPin size={18} color={Colors.textMuted} />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Адрес (улица)"
+                placeholderTextColor={Colors.textMuted}
+                value={address}
+                onChangeText={setAddress}
+                testID="input-address"
+              />
+            </View>
+
+            <View style={styles.addressRow}>
+              <View style={[styles.inputWrapper, { flex: 1 }]}>
+                <View style={styles.inputIcon}>
+                  <Home size={18} color={Colors.textMuted} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Дом"
+                  placeholderTextColor={Colors.textMuted}
+                  value={building}
+                  onChangeText={setBuilding}
+                  testID="input-building"
+                />
+              </View>
+              <View style={{ width: 10 }} />
+              <View style={[styles.inputWrapper, { flex: 1 }]}>
+                <View style={styles.inputIcon}>
+                  <DoorOpen size={18} color={Colors.textMuted} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Квартира"
+                  placeholderTextColor={Colors.textMuted}
+                  value={apartment}
+                  onChangeText={setApartment}
+                  keyboardType="numeric"
+                  testID="input-apartment"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputWrapper}>
+              <View style={styles.inputIcon}>
+                <MessageSquare size={18} color={Colors.textMuted} />
+              </View>
+              <TextInput
+                style={[styles.input, styles.commentInput]}
+                placeholder="Комментарий к заказу"
+                placeholderTextColor={Colors.textMuted}
+                value={comment}
+                onChangeText={setComment}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                testID="input-comment"
               />
             </View>
           </View>
@@ -551,6 +629,13 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: Colors.primary,
+  },
+  addressRow: {
+    flexDirection: 'row' as const,
+  },
+  commentInput: {
+    minHeight: 80,
+    paddingTop: 14,
   },
   errorText: {
     color: Colors.primary,
