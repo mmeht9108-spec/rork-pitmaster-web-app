@@ -29,7 +29,7 @@ export const products: Product[] = [
     description: 'Домашние колбаски с сыром чеддер внутри. Копчёные на вишнёвой щепе с добавлением халапеньо.',
     price: 1200,
     weight: '400 г',
-    image: 'https://images.unsplash.com/photo-1598894293919-e87b10f10b8e?w=800&q=80',
+    image: 'https://cdn.stocksnap.io/img-thumbs/960w/black%20and%20white-dog_0CWZE3NWFS.jpg',
     category: 'Колбаски',
     isPopular: true,
     heatingTime: '8-10 мин',
