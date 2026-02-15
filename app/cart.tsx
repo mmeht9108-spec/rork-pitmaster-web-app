@@ -62,6 +62,22 @@ export default function CartScreen() {
       return;
     }
 
+    const botToken = process.env.EXPO_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.EXPO_PUBLIC_TELEGRAM_CHAT_ID;
+
+    console.log('Starting order submission...');
+    console.log('Bot token exists:', !!botToken);
+    console.log('Chat ID:', chatId);
+
+    if (!botToken || !chatId) {
+      console.error('Missing Telegram credentials');
+      Alert.alert(
+        'Ошибка конфигурации',
+        'Отсутствуют данные для отправки заказа. Обратитесь к администратору.'
+      );
+      return;
+    }
+
     const orderLines = items.map(
       (item) => `• ${item.product.name} x${item.quantity} — ${item.product.price * item.quantity} ₽`
     ).join('\n');
@@ -80,30 +96,39 @@ export default function CartScreen() {
     ].filter(Boolean).join('\n');
 
     try {
-      const botToken = process.env.EXPO_PUBLIC_TELEGRAM_BOT_TOKEN;
-      const chatId = process.env.EXPO_PUBLIC_TELEGRAM_CHAT_ID;
+      console.log('Sending to Telegram...');
+      console.log('Message:', message);
 
-      if (!botToken || !chatId) {
-        throw new Error('Missing Telegram envs');
-      }
+      const telegramResponse = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message,
+          }),
+        }
+      );
 
-      console.log('Telegram send start', { chatId });
-
-      const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-        }),
-      });
-
+      console.log('Telegram response status:', telegramResponse.status);
+      
       const telegramData = await telegramResponse.json();
-      console.log('Telegram send response', telegramData);
+      console.log('Telegram response data:', JSON.stringify(telegramData));
 
-      if (!telegramResponse.ok || !telegramData?.ok) {
-        throw new Error(telegramData?.description || 'Telegram send failed');
+      if (!telegramResponse.ok) {
+        console.error('Telegram API error:', telegramData);
+        throw new Error(
+          telegramData?.description || `Telegram error: ${telegramResponse.status}`
+        );
       }
+
+      if (!telegramData.ok) {
+        console.error('Telegram returned ok=false:', telegramData);
+        throw new Error(telegramData.description || 'Telegram send failed');
+      }
+
+      console.log('Telegram message sent successfully!');
 
       const emailBody = [
         '<h2>🔥 Новый заказ!</h2>',
@@ -120,6 +145,7 @@ export default function CartScreen() {
       ].filter(Boolean).join('\n');
 
       try {
+        console.log('Sending email notification...');
         const emailResponse = await fetch('https://formsubmit.co/ajax/meht-91@yandex.ru', {
           method: 'POST',
           headers: { 
@@ -137,15 +163,19 @@ export default function CartScreen() {
         });
 
         const emailData = await emailResponse.json();
-        console.log('Email send response', emailData);
+        console.log('Email response:', emailData);
       } catch (emailError) {
-        console.log('Email send error (non-critical):', emailError);
+        console.warn('Email send error (non-critical):', emailError);
       }
-    } catch (e) {
-      console.log('Order send error:', e);
+    } catch (error) {
+      console.error('Order submission error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error details:', errorMessage);
+      
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+      
       Alert.alert(
         'Не удалось отправить заказ',
         'Проверьте подключение и попробуйте ещё раз.'
