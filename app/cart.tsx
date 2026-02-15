@@ -95,37 +95,38 @@ export default function CartScreen() {
       `💰 Итого: ${totalPrice} ₽`,
     ].filter(Boolean).join('\n');
 
-    try {
-      console.log('Sending to Telegram...');
-      console.log('Bot token exists:', !!botToken);
-      console.log('Chat ID:', chatId);
-      console.log('Message:', message);
+    const chatIds = [String(chatId).trim(), '-1001783641782'];
 
-      const telegramResponse = await fetch(
-        `https://api.telegram.org/bot${botToken}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: String(chatId).trim(),
-            text: message,
-            parse_mode: 'HTML',
-          }),
+    for (const cid of chatIds) {
+      try {
+        console.log(`Sending to Telegram chat ${cid}...`);
+
+        const telegramResponse = await fetch(
+          `https://api.telegram.org/bot${botToken}/sendMessage`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: cid,
+              text: message,
+              parse_mode: 'HTML',
+            }),
+          }
+        );
+
+        console.log(`Telegram response status for ${cid}:`, telegramResponse.status);
+
+        const telegramData = await telegramResponse.json();
+        console.log(`Telegram response data for ${cid}:`, JSON.stringify(telegramData));
+
+        if (!telegramResponse.ok || !telegramData.ok) {
+          console.warn(`Telegram send failed for ${cid}:`, telegramData?.description);
+        } else {
+          console.log(`Telegram message sent successfully to ${cid}!`);
         }
-      );
-
-      console.log('Telegram response status:', telegramResponse.status);
-      
-      const telegramData = await telegramResponse.json();
-      console.log('Telegram response data:', JSON.stringify(telegramData));
-
-      if (!telegramResponse.ok || !telegramData.ok) {
-        console.warn('Telegram send failed (non-critical):', telegramData?.description);
-      } else {
-        console.log('Telegram message sent successfully!');
+      } catch (telegramError) {
+        console.warn(`Telegram send error for ${cid}:`, telegramError);
       }
-    } catch (telegramError) {
-      console.warn('Telegram send error (non-critical):', telegramError);
     }
 
     try {
