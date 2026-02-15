@@ -89,7 +89,7 @@ export default function CartScreen() {
 
       console.log('Telegram send start', { chatId });
 
-      const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,14 +98,51 @@ export default function CartScreen() {
         }),
       });
 
-      const data = await response.json();
-      console.log('Telegram send response', data);
+      const telegramData = await telegramResponse.json();
+      console.log('Telegram send response', telegramData);
 
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.description || 'Telegram send failed');
+      if (!telegramResponse.ok || !telegramData?.ok) {
+        throw new Error(telegramData?.description || 'Telegram send failed');
+      }
+
+      const emailBody = [
+        '<h2>🔥 Новый заказ!</h2>',
+        `<p><strong>👤 Имя:</strong> ${name.trim()}</p>`,
+        `<p><strong>📞 Телефон:</strong> ${phone.trim()}</p>`,
+        email.trim() ? `<p><strong>📧 Email:</strong> ${email.trim()}</p>` : '',
+        '<h3>📦 Заказ:</h3>',
+        '<ul>',
+        ...items.map(item => 
+          `<li>${item.product.name} x${item.quantity} — ${item.product.price * item.quantity} ₽</li>`
+        ),
+        '</ul>',
+        `<p><strong>💰 Итого: ${totalPrice} ₽</strong></p>`,
+      ].filter(Boolean).join('\n');
+
+      try {
+        const emailResponse = await fetch('https://formsubmit.co/ajax/meht-91@yandex.ru', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            name: name.trim(),
+            phone: phone.trim(),
+            email: email.trim() || 'не указан',
+            message: emailBody,
+            _subject: `Новый заказ от ${name.trim()}`,
+            _template: 'table',
+          }),
+        });
+
+        const emailData = await emailResponse.json();
+        console.log('Email send response', emailData);
+      } catch (emailError) {
+        console.log('Email send error (non-critical):', emailError);
       }
     } catch (e) {
-      console.log('Telegram send error:', e);
+      console.log('Order send error:', e);
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
