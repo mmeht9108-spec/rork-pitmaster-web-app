@@ -5,6 +5,7 @@ import React, { useEffect } from 'react';
 import { View, Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { CartProvider } from '@/contexts/CartContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import Colors from '@/constants/colors';
 
 SplashScreen.preventAutoHideAsync();
@@ -40,9 +41,11 @@ export default function RootLayout() {
   }, []);
 
   const content = (
-    <CartProvider>
-      <RootLayoutNav />
-    </CartProvider>
+    <AuthProvider>
+      <CartProvider>
+        <RootLayoutNav />
+      </CartProvider>
+    </AuthProvider>
   );
 
   if (Platform.OS === 'web') {

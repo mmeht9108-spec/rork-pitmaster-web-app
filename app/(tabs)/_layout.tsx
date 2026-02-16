@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, UtensilsCrossed, Flame, Phone } from 'lucide-react-native';
+import { Home, UtensilsCrossed, Flame, Phone, UserCircle } from 'lucide-react-native';
 import React from 'react';
 import Colors from '@/constants/colors';
 
@@ -45,7 +45,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Phone size={size} color={color} />,
         }}
       />
-
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Профиль',
+          tabBarIcon: ({ color, size }) => <UserCircle size={size} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

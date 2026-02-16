@@ -32,12 +32,14 @@ import { Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 type DeliveryMethod = 'pickup' | 'delivery';
 
 export default function CartScreen() {
   const router = useRouter();
   const { items, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart();
+  const { isLoggedIn, addOrder } = useAuth();
 
   const [step, setStep] = useState<1 | 2>(1);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -226,6 +228,23 @@ export default function CartScreen() {
       console.log('Email response:', emailData);
     } catch (emailError) {
       console.warn('Email send error (non-critical):', emailError);
+    }
+
+    if (isLoggedIn) {
+      try {
+        await addOrder({
+          items,
+          totalPrice,
+          deliveryMethod,
+          address: deliveryMethod === 'delivery' ? address.trim() : undefined,
+          comment: comment.trim() || undefined,
+          userName: name.trim(),
+          userPhone: phone.replace(/[\s\-\(\)]/g, ''),
+        });
+        console.log('Order saved to history');
+      } catch (orderErr) {
+        console.warn('Failed to save order to history:', orderErr);
+      }
     }
 
     if (Platform.OS !== 'web') {
