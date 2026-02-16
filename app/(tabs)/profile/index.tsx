@@ -26,6 +26,9 @@ import {
   Edit3,
   Check,
   X,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -62,11 +65,13 @@ export default function ProfileScreen() {
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string>('');
 
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>('');
-  const [editEmail, setEditEmail] = useState<string>('');
+  const [editPhone, setEditPhone] = useState<string>('');
 
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
@@ -80,6 +85,7 @@ export default function ProfileScreen() {
     }).start(() => {
       setAuthMode(mode);
       setAuthError('');
+      setPassword('');
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 180,
@@ -94,39 +100,58 @@ export default function ProfileScreen() {
       setAuthError('Введите имя');
       return;
     }
-    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
-    if (cleanPhone.length < 10) {
-      setAuthError('Введите корректный номер телефона');
+    if (!email.trim()) {
+      setAuthError('Введите email');
+      return;
+    }
+    if (password.length < 6) {
+      setAuthError('Пароль должен быть не менее 6 символов');
       return;
     }
     try {
-      await register({ name: name.trim(), phone: cleanPhone, email: email.trim() || undefined });
+      await register({
+        email: email.trim(),
+        password,
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+      });
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setName('');
       setPhone('');
       setEmail('');
+      setPassword('');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Ошибка регистрации';
       setAuthError(message);
     }
-  }, [name, phone, email, register]);
+  }, [name, phone, email, password, register]);
 
   const handleLogin = useCallback(async () => {
     setAuthError('');
-    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
-    if (cleanPhone.length < 10) {
-      setAuthError('Введите корректный номер телефона');
+    if (!email.trim()) {
+      setAuthError('Введите email');
+      return;
+    }
+    if (!password) {
+      setAuthError('Введите пароль');
       return;
     }
     try {
-      await login({ phone: cleanPhone });
+      await login({ email: email.trim(), password });
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setPhone('');
+      setEmail('');
+      setPassword('');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Ошибка входа';
-      setAuthError(message);
+      if (message.includes('Invalid login credentials')) {
+        setAuthError('Неверный email или пароль');
+      } else if (message.includes('Email not confirmed')) {
+        setAuthError('Подтвердите email по ссылке в письме');
+      } else {
+        setAuthError(message);
+      }
     }
-  }, [phone, login]);
+  }, [email, password, login]);
 
   const handleLogout = useCallback(() => {
     Alert.alert('Выход', 'Вы уверены, что хотите выйти?', [
@@ -144,20 +169,20 @@ export default function ProfileScreen() {
 
   const startEditing = useCallback(() => {
     setEditName(user?.name ?? '');
-    setEditEmail(user?.email ?? '');
+    setEditPhone(user?.phone ?? '');
     setIsEditing(true);
   }, [user]);
 
   const handleSaveProfile = useCallback(async () => {
     if (!editName.trim()) return;
     try {
-      await updateProfile({ name: editName.trim(), email: editEmail.trim() || undefined });
+      await updateProfile({ name: editName.trim(), phone: editPhone.trim() || undefined });
       setIsEditing(false);
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       Alert.alert('Ошибка', 'Не удалось обновить профиль');
     }
-  }, [editName, editEmail, updateProfile]);
+  }, [editName, editPhone, updateProfile]);
 
   const toggleOrder = useCallback((orderId: string) => {
     if (Platform.OS !== 'web') Haptics.selectionAsync();
@@ -222,33 +247,60 @@ export default function ProfileScreen() {
 
           <View style={styles.inputWrapper}>
             <View style={styles.inputIcon}>
-              <Phone size={18} color={Colors.textMuted} />
+              <Mail size={18} color={Colors.textMuted} />
             </View>
             <TextInput
               style={styles.input}
-              placeholder="Телефон *"
+              placeholder="Email *"
               placeholderTextColor={Colors.textMuted}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              testID="auth-phone"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              testID="auth-email"
             />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <View style={styles.inputIcon}>
+              <Lock size={18} color={Colors.textMuted} />
+            </View>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              placeholder="Пароль *"
+              placeholderTextColor={Colors.textMuted}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              testID="auth-password"
+            />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setShowPassword((v) => !v)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              {showPassword ? (
+                <EyeOff size={18} color={Colors.textMuted} />
+              ) : (
+                <Eye size={18} color={Colors.textMuted} />
+              )}
+            </TouchableOpacity>
           </View>
 
           {authMode === 'register' && (
             <View style={styles.inputWrapper}>
               <View style={styles.inputIcon}>
-                <Mail size={18} color={Colors.textMuted} />
+                <Phone size={18} color={Colors.textMuted} />
               </View>
               <TextInput
                 style={styles.input}
-                placeholder="Email (необязательно)"
+                placeholder="Телефон (необязательно)"
                 placeholderTextColor={Colors.textMuted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                testID="auth-email"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                testID="auth-phone"
               />
             </View>
           )}
@@ -312,19 +364,18 @@ export default function ProfileScreen() {
                 />
                 <TextInput
                   style={[styles.editInput, styles.editInputSmall]}
-                  value={editEmail}
-                  onChangeText={setEditEmail}
-                  placeholder="Email"
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  placeholder="Телефон"
                   placeholderTextColor={Colors.textMuted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
+                  keyboardType="phone-pad"
                 />
               </>
             ) : (
               <>
                 <Text style={styles.profileName}>{user?.name}</Text>
-                <Text style={styles.profilePhone}>{user?.phone}</Text>
-                {user?.email ? <Text style={styles.profileEmail}>{user.email}</Text> : null}
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+                {user?.phone ? <Text style={styles.profilePhone}>{user.phone}</Text> : null}
               </>
             )}
           </View>
@@ -534,6 +585,15 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     marginBottom: 8,
   },
+  passwordInput: {
+    paddingRight: 48,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 14,
+    top: 16,
+    zIndex: 1,
+  },
   errorText: {
     color: Colors.primary,
     fontSize: 13,
@@ -603,12 +663,12 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: Colors.text,
   },
-  profilePhone: {
+  profileEmail: {
     fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  profileEmail: {
+  profilePhone: {
     fontSize: 13,
     color: Colors.textMuted,
     marginTop: 2,

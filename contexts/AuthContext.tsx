@@ -1,28 +1,62 @@
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 import { User, Order, CartItem } from '@/types/product';
+import { Session } from '@supabase/supabase-js';
 
-const USERS_KEY = 'app_users';
-const CURRENT_USER_KEY = 'app_current_user';
 const ORDERS_KEY = 'app_orders';
-
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const currentUserQuery = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: async () => {
-      const stored = await AsyncStorage.getItem(CURRENT_USER_KEY);
-      return stored ? (JSON.parse(stored) as User) : null;
-    },
-  });
+  useEffect(() => {
+    console.log('[Auth] Initializing Supabase auth listener...');
+
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log('[Auth] Initial session:', currentSession ? 'found' : 'none');
+      setSession(currentSession);
+      if (currentSession?.user) {
+        const meta = currentSession.user.user_metadata;
+        setUser({
+          id: currentSession.user.id,
+          name: meta?.name ?? '',
+          phone: meta?.phone ?? '',
+          email: currentSession.user.email ?? '',
+          createdAt: currentSession.user.created_at,
+        });
+      }
+      setIsLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        console.log('[Auth] Auth state changed:', _event);
+        setSession(newSession);
+        if (newSession?.user) {
+          const meta = newSession.user.user_metadata;
+          setUser({
+            id: newSession.user.id,
+            name: meta?.name ?? '',
+            phone: meta?.phone ?? '',
+            email: newSession.user.email ?? '',
+            createdAt: newSession.user.created_at,
+          });
+        } else {
+          setUser(null);
+        }
+        setIsLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const ordersQuery = useQuery({
     queryKey: ['orders', user?.id],
@@ -31,75 +65,77 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const stored = await AsyncStorage.getItem(ORDERS_KEY);
       const allOrders: Order[] = stored ? JSON.parse(stored) : [];
       return allOrders
-        .filter((o) => o.userPhone === user.phone)
+        .filter((o) => o.userPhone === user.phone || o.userName === user.name)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     },
     enabled: !!user,
   });
 
-  useEffect(() => {
-    if (currentUserQuery.data !== undefined) {
-      setUser(currentUserQuery.data);
-    }
-  }, [currentUserQuery.data]);
-
   const registerMutation = useMutation({
-    mutationFn: async (data: { name: string; phone: string; email?: string }) => {
-      const stored = await AsyncStorage.getItem(USERS_KEY);
-      const users: User[] = stored ? JSON.parse(stored) : [];
+    mutationFn: async (data: { email: string; password: string; name: string; phone?: string }) => {
+      console.log('[Auth] Registering user:', data.email);
+      const { data: authData, error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            name: data.name,
+            phone: data.phone ?? '',
+          },
+        },
+      });
 
-      const existing = users.find((u) => u.phone === data.phone);
-      if (existing) {
-        throw new Error('Пользователь с таким номером уже зарегистрирован');
+      if (error) {
+        console.error('[Auth] Register error:', error.message);
+        throw new Error(error.message);
       }
 
-      const newUser: User = {
-        id: generateId(),
-        name: data.name,
-        phone: data.phone,
-        email: data.email,
-        createdAt: new Date().toISOString(),
-      };
+      if (!authData.user) {
+        throw new Error('Не удалось создать пользователя');
+      }
 
-      users.push(newUser);
-      await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
-      await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
-      return newUser;
+      console.log('[Auth] User registered successfully:', authData.user.id);
+      return authData;
     },
-    onSuccess: (newUser) => {
-      setUser(newUser);
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (data: { phone: string }) => {
-      const stored = await AsyncStorage.getItem(USERS_KEY);
-      const users: User[] = stored ? JSON.parse(stored) : [];
+    mutationFn: async (data: { email: string; password: string }) => {
+      console.log('[Auth] Logging in user:', data.email);
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
 
-      const found = users.find((u) => u.phone === data.phone);
-      if (!found) {
-        throw new Error('Пользователь не найден. Зарегистрируйтесь.');
+      if (error) {
+        console.error('[Auth] Login error:', error.message);
+        throw new Error(error.message);
       }
 
-      await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(found));
-      return found;
+      console.log('[Auth] User logged in successfully:', authData.user.id);
+      return authData;
     },
-    onSuccess: (foundUser) => {
-      setUser(foundUser);
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await AsyncStorage.removeItem(CURRENT_USER_KEY);
+      console.log('[Auth] Logging out...');
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('[Auth] Logout error:', error.message);
+        throw new Error(error.message);
+      }
+      console.log('[Auth] Logged out successfully');
     },
     onSuccess: () => {
       setUser(null);
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      setSession(null);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
@@ -115,7 +151,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       userPhone: string;
     }) => {
       const order: Order = {
-        id: generateId(),
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
         items: orderData.items,
         totalPrice: orderData.totalPrice,
         deliveryMethod: orderData.deliveryMethod,
@@ -139,30 +175,38 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { name: string; email?: string }) => {
-      if (!user) throw new Error('Не авторизован');
+    mutationFn: async (data: { name: string; phone?: string }) => {
+      console.log('[Auth] Updating profile...');
+      const { data: updatedData, error } = await supabase.auth.updateUser({
+        data: {
+          name: data.name,
+          phone: data.phone ?? '',
+        },
+      });
 
-      const stored = await AsyncStorage.getItem(USERS_KEY);
-      const users: User[] = stored ? JSON.parse(stored) : [];
-
-      const idx = users.findIndex((u) => u.id === user.id);
-      if (idx >= 0) {
-        users[idx] = { ...users[idx], name: data.name, email: data.email };
-        await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
-        await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(users[idx]));
-        return users[idx];
+      if (error) {
+        console.error('[Auth] Update profile error:', error.message);
+        throw new Error(error.message);
       }
-      throw new Error('Пользователь не найден');
+
+      const meta = updatedData.user.user_metadata;
+      const updatedUser: User = {
+        id: updatedData.user.id,
+        name: meta?.name ?? '',
+        phone: meta?.phone ?? '',
+        email: updatedData.user.email ?? '',
+        createdAt: updatedData.user.created_at,
+      };
+
+      console.log('[Auth] Profile updated successfully');
+      return updatedUser;
     },
-    onSuccess: (updated) => {
-      setUser(updated);
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    onSuccess: (updatedUser) => {
+      setUser(updatedUser);
     },
   });
 
-  const isLoading = currentUserQuery.isLoading;
-  const isLoggedIn = !!user;
-
+  const isLoggedIn = !!session && !!user;
   const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
 
   return {
@@ -173,10 +217,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     ordersLoading: ordersQuery.isLoading,
     register: registerMutation.mutateAsync,
     registerPending: registerMutation.isPending,
-    registerError: registerMutation.error?.message ?? null,
     login: loginMutation.mutateAsync,
     loginPending: loginMutation.isPending,
-    loginError: loginMutation.error?.message ?? null,
     logout: logoutMutation.mutate,
     addOrder: addOrderMutation.mutateAsync,
     updateProfile: updateProfileMutation.mutateAsync,
