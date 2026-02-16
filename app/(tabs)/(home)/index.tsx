@@ -97,7 +97,7 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={product.id}
                   style={styles.popularCard}
-                  onPress={() => router.push(`/(tabs)/(home)/product/${product.id}`)}
+                  onPress={() => router.push(`/(tabs)/(home)/product/${product.id}` as any)}
                   activeOpacity={0.8}
                 >
                   <Image
@@ -138,7 +138,7 @@ export default function HomeScreen() {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  onPress={() => router.push(`/(tabs)/(home)/product/${product.id}`)}
+                  onPress={() => router.push(`/(tabs)/(home)/product/${product.id}` as any)}
                 />
               ))}
             </View>

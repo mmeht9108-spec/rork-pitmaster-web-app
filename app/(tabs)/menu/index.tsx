@@ -82,7 +82,7 @@ export default function MenuScreen() {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  onPress={() => router.push(`/(tabs)/(home)/product/${product.id}`)}
+                  onPress={() => router.push(`/(tabs)/(home)/product/${product.id}` as any)}
                 />
               ))}
             </View>

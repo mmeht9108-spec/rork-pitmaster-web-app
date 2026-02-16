@@ -14,7 +14,7 @@ export default function CartButton() {
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={() => router.push('/cart')}
+      onPress={() => router.push('/cart' as any)}
       activeOpacity={0.9}
       testID="cart-button"
     >
