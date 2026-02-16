@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, MapPin, Home, DoorOpen, MessageSquare } from 'lucide-react-native';
+import { Minus, Plus, Trash2, ShoppingBag, User, Phone, Mail, MapPin, Home, DoorOpen, MessageSquare, Check } from 'lucide-react-native';
+import { Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useCart } from '@/contexts/CartContext';
@@ -29,6 +30,8 @@ export default function CartScreen() {
   const [building, setBuilding] = useState<string>('');
   const [apartment, setApartment] = useState<string>('');
   const [comment, setComment] = useState<string>('');
+  const [privacyAccepted, setPrivacyAccepted] = useState<boolean>(false);
+  const [privacyError, setPrivacyError] = useState<string>('');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
 
   const handleQuantityChange = (productId: string, delta: number, currentQty: number) => {
@@ -54,8 +57,13 @@ export default function CartScreen() {
     if (!cleanPhone || cleanPhone.length < 10) {
       newErrors.phone = 'Введите корректный номер телефона';
     }
+    if (!privacyAccepted) {
+      setPrivacyError('Необходимо дать согласие на обработку персональных данных');
+    } else {
+      setPrivacyError('');
+    }
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0 && privacyAccepted;
   };
 
   const handleCheckout = async () => {
@@ -197,6 +205,8 @@ export default function CartScreen() {
             setBuilding('');
             setApartment('');
             setComment('');
+            setPrivacyAccepted(false);
+            setPrivacyError('');
             setErrors({});
             router.back();
           },
@@ -402,6 +412,32 @@ export default function CartScreen() {
               />
             </View>
           </View>
+
+          <View style={styles.privacySection}>
+            <TouchableOpacity
+              style={styles.privacyRow}
+              onPress={() => {
+                setPrivacyAccepted((v) => !v);
+                if (privacyError) setPrivacyError('');
+              }}
+              activeOpacity={0.7}
+              testID="privacy-checkbox"
+            >
+              <View style={[styles.checkbox, privacyAccepted && styles.checkboxChecked, privacyError ? styles.checkboxError : null]}>
+                {privacyAccepted ? <Check size={16} color={Colors.text} strokeWidth={3} /> : null}
+              </View>
+              <Text style={styles.privacyText}>
+                Я согласен на обработку{' '}
+                <Text
+                  style={styles.privacyLink}
+                  onPress={() => Linking.openURL('/privacy')}
+                >
+                  персональных данных
+                </Text>
+              </Text>
+            </TouchableOpacity>
+            {privacyError ? <Text style={styles.privacyErrorText}>{privacyError}</Text> : null}
+          </View>
         </ScrollView>
       </SafeAreaView>
 
@@ -411,12 +447,12 @@ export default function CartScreen() {
           <Text style={styles.totalPrice}>{totalPrice} ₽</Text>
         </View>
         <TouchableOpacity
-          style={styles.checkoutButton}
+          style={[styles.checkoutButton, !privacyAccepted && styles.checkoutButtonDisabled]}
           onPress={handleCheckout}
-          activeOpacity={0.8}
+          activeOpacity={privacyAccepted ? 0.8 : 1}
           testID="checkout-button"
         >
-          <Text style={styles.checkoutButtonText}>Оформить заказ</Text>
+          <Text style={[styles.checkoutButtonText, !privacyAccepted && styles.checkoutButtonTextDisabled]}>Оформить заказ</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </View>
@@ -643,5 +679,54 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
     marginTop: -4,
+  },
+  privacySection: {
+    marginBottom: 24,
+    paddingHorizontal: 4,
+  },
+  privacyRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+  },
+  checkbox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginRight: 12,
+    marginTop: 1,
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  checkboxError: {
+    borderColor: Colors.primary,
+  },
+  privacyText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  privacyLink: {
+    color: Colors.secondary,
+    textDecorationLine: 'underline' as const,
+  },
+  privacyErrorText: {
+    color: Colors.primary,
+    fontSize: 12,
+    marginTop: 8,
+    marginLeft: 38,
+  },
+  checkoutButtonDisabled: {
+    backgroundColor: Colors.surfaceLight,
+  },
+  checkoutButtonTextDisabled: {
+    color: Colors.textMuted,
   },
 });
