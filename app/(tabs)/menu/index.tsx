@@ -14,6 +14,7 @@ import { products, categories } from '@/mocks/products';
 import ProductCard from '@/components/ProductCard';
 import CategoryPill from '@/components/CategoryPill';
 import CartButton from '@/components/CartButton';
+import HeaderCartIcon from '@/components/HeaderCartIcon';
 
 export default function MenuScreen() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function MenuScreen() {
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <View style={styles.header}>
           <Text style={styles.title}>Меню</Text>
+          <HeaderCartIcon />
         </View>
 
         <View style={styles.searchContainer}>
@@ -110,6 +112,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },

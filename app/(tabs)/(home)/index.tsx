@@ -17,6 +17,7 @@ import { products, categories } from '@/mocks/products';
 import ProductCard from '@/components/ProductCard';
 import CategoryPill from '@/components/CategoryPill';
 import CartButton from '@/components/CartButton';
+import HeaderCartIcon from '@/components/HeaderCartIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -56,6 +57,7 @@ export default function HomeScreen() {
                 <Text style={styles.location}>Владивосток</Text>
               </View>
             </View>
+            <HeaderCartIcon />
           </View>
 
           <TouchableOpacity style={styles.heroBanner} activeOpacity={0.9}>
