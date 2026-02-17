@@ -126,7 +126,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       });
 
       if (profileError) {
-        console.error('[Auth] Profile insert error:', profileError.message);
+        console.warn('[Auth] Profile insert error (table may not exist yet):', profileError.message);
+        console.warn('[Auth] Registration succeeded but profile was not saved to profiles table.');
+        console.warn('[Auth] Please create the profiles table in Supabase SQL Editor.');
       } else {
         console.log('[Auth] Profile created successfully');
       }
