@@ -118,22 +118,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         throw new Error('Не удалось создать пользователя');
       }
 
-      console.log('[Auth] User registered, creating profile in profiles table...');
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        full_name: data.full_name,
-        phone: data.phone,
-      });
-
-      if (profileError) {
-        console.warn('[Auth] Profile insert error (table may not exist yet):', profileError.message);
-        console.warn('[Auth] Registration succeeded but profile was not saved to profiles table.');
-        console.warn('[Auth] Please create the profiles table in Supabase SQL Editor.');
-      } else {
-        console.log('[Auth] Profile created successfully');
-      }
-
       console.log('[Auth] User registered successfully:', authData.user.id);
+      console.log('[Auth] Profile will be created automatically via database trigger.');
       return authData;
     },
     onSuccess: () => {
