@@ -119,7 +119,21 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
 
       console.log('[Auth] User registered successfully:', authData.user.id);
-      console.log('[Auth] Profile will be created automatically via database trigger.');
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: authData.user.id,
+          full_name: data.full_name,
+          phone: data.phone,
+        });
+
+      if (profileError) {
+        console.warn('[Auth] Profile insert error:', profileError.message);
+      } else {
+        console.log('[Auth] Profile created successfully');
+      }
+
       return authData;
     },
     onSuccess: () => {
