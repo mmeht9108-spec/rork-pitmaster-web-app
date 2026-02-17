@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,11 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  Animated,
   Platform,
   ActivityIndicator,
   Image,
 } from 'react-native';
 import {
-  UserCircle,
   Phone,
   Mail,
   LogOut,
@@ -26,16 +24,11 @@ import {
   Edit3,
   Check,
   X,
-  Lock,
-  Eye,
-  EyeOff,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { Order } from '@/types/product';
-
-type AuthMode = 'login' | 'register';
 
 const STATUS_MAP: Record<Order['status'], { label: string; color: string }> = {
   pending: { label: 'Новый', color: Colors.secondary },
@@ -48,110 +41,17 @@ const STATUS_MAP: Record<Order['status'], { label: string; color: string }> = {
 export default function ProfileScreen() {
   const {
     user,
-    isLoggedIn,
-    isLoading,
     orders,
     ordersLoading,
-    register,
-    registerPending,
-    login,
-    loginPending,
     logout,
     updateProfile,
     updateProfilePending,
   } = useAuth();
 
-  const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const [name, setName] = useState<string>('');
-  const [phone, setPhone] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [authError, setAuthError] = useState<string>('');
-
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>('');
   const [editPhone, setEditPhone] = useState<string>('');
-
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-
-  const switchMode = useCallback((mode: AuthMode) => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 120,
-      useNativeDriver: true,
-    }).start(() => {
-      setAuthMode(mode);
-      setAuthError('');
-      setPassword('');
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
-    });
-  }, [fadeAnim]);
-
-  const handleRegister = useCallback(async () => {
-    setAuthError('');
-    if (!name.trim()) {
-      setAuthError('Введите имя');
-      return;
-    }
-    if (!email.trim()) {
-      setAuthError('Введите email');
-      return;
-    }
-    if (password.length < 6) {
-      setAuthError('Пароль должен быть не менее 6 символов');
-      return;
-    }
-    try {
-      await register({
-        email: email.trim(),
-        password,
-        name: name.trim(),
-        phone: phone.trim() || undefined,
-      });
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setName('');
-      setPhone('');
-      setEmail('');
-      setPassword('');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Ошибка регистрации';
-      setAuthError(message);
-    }
-  }, [name, phone, email, password, register]);
-
-  const handleLogin = useCallback(async () => {
-    setAuthError('');
-    if (!email.trim()) {
-      setAuthError('Введите email');
-      return;
-    }
-    if (!password) {
-      setAuthError('Введите пароль');
-      return;
-    }
-    try {
-      await login({ email: email.trim(), password });
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setEmail('');
-      setPassword('');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Ошибка входа';
-      if (message.includes('Invalid login credentials')) {
-        setAuthError('Неверный email или пароль');
-      } else if (message.includes('Email not confirmed')) {
-        setAuthError('Подтвердите email по ссылке в письме');
-      } else {
-        setAuthError(message);
-      }
-    }
-  }, [email, password, login]);
 
   const handleLogout = useCallback(() => {
     Alert.alert('Выход', 'Вы уверены, что хотите выйти?', [
@@ -199,146 +99,6 @@ export default function ProfileScreen() {
     return `${day}.${month}.${year} в ${hours}:${minutes}`;
   }, []);
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
-
-  if (!isLoggedIn) {
-    return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.authScrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.authHeader}>
-          <View style={styles.avatarLarge}>
-            <UserCircle size={56} color={Colors.textMuted} strokeWidth={1.2} />
-          </View>
-          <Text style={styles.authTitle}>
-            {authMode === 'login' ? 'Вход в аккаунт' : 'Регистрация'}
-          </Text>
-          <Text style={styles.authSubtitle}>
-            {authMode === 'login'
-              ? 'Войдите, чтобы видеть историю заказов'
-              : 'Создайте аккаунт для отслеживания заказов'}
-          </Text>
-        </View>
-
-        <Animated.View style={[styles.authForm, { opacity: fadeAnim }]}>
-          {authMode === 'register' && (
-            <View style={styles.inputWrapper}>
-              <View style={styles.inputIcon}>
-                <UserCircle size={18} color={Colors.textMuted} />
-              </View>
-              <TextInput
-                style={styles.input}
-                placeholder="Имя *"
-                placeholderTextColor={Colors.textMuted}
-                value={name}
-                onChangeText={setName}
-                testID="auth-name"
-              />
-            </View>
-          )}
-
-          <View style={styles.inputWrapper}>
-            <View style={styles.inputIcon}>
-              <Mail size={18} color={Colors.textMuted} />
-            </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Email *"
-              placeholderTextColor={Colors.textMuted}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              testID="auth-email"
-            />
-          </View>
-
-          <View style={styles.inputWrapper}>
-            <View style={styles.inputIcon}>
-              <Lock size={18} color={Colors.textMuted} />
-            </View>
-            <TextInput
-              style={[styles.input, styles.passwordInput]}
-              placeholder="Пароль *"
-              placeholderTextColor={Colors.textMuted}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              testID="auth-password"
-            />
-            <TouchableOpacity
-              style={styles.eyeButton}
-              onPress={() => setShowPassword((v) => !v)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              {showPassword ? (
-                <EyeOff size={18} color={Colors.textMuted} />
-              ) : (
-                <Eye size={18} color={Colors.textMuted} />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {authMode === 'register' && (
-            <View style={styles.inputWrapper}>
-              <View style={styles.inputIcon}>
-                <Phone size={18} color={Colors.textMuted} />
-              </View>
-              <TextInput
-                style={styles.input}
-                placeholder="Телефон (необязательно)"
-                placeholderTextColor={Colors.textMuted}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                testID="auth-phone"
-              />
-            </View>
-          )}
-
-          {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
-
-          <TouchableOpacity
-            style={[styles.authButton, (registerPending || loginPending) && styles.authButtonDisabled]}
-            onPress={authMode === 'login' ? handleLogin : handleRegister}
-            activeOpacity={0.85}
-            disabled={registerPending || loginPending}
-            testID="auth-submit"
-          >
-            {(registerPending || loginPending) ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.authButtonText}>
-                {authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.switchBtn}
-            onPress={() => switchMode(authMode === 'login' ? 'register' : 'login')}
-          >
-            <Text style={styles.switchText}>
-              {authMode === 'login' ? 'Нет аккаунта? ' : 'Уже есть аккаунт? '}
-              <Text style={styles.switchLink}>
-                {authMode === 'login' ? 'Зарегистрируйтесь' : 'Войдите'}
-              </Text>
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
-    );
-  }
-
   return (
     <ScrollView
       style={styles.container}
@@ -374,8 +134,16 @@ export default function ProfileScreen() {
             ) : (
               <>
                 <Text style={styles.profileName}>{user?.name}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
-                {user?.phone ? <Text style={styles.profilePhone}>{user.phone}</Text> : null}
+                <View style={styles.profileDetailRow}>
+                  <Mail size={14} color={Colors.textSecondary} />
+                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                </View>
+                {user?.phone ? (
+                  <View style={styles.profileDetailRow}>
+                    <Phone size={14} color={Colors.textSecondary} />
+                    <Text style={styles.profilePhone}>{user.phone}</Text>
+                  </View>
+                ) : null}
               </>
             )}
           </View>
@@ -523,110 +291,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  authScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  authHeader: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  avatarLarge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: Colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  authTitle: {
-    fontSize: 24,
-    fontWeight: '700' as const,
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  authSubtitle: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  authForm: {
-    gap: 4,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: 14,
-    zIndex: 1,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingLeft: 44,
-    paddingRight: 16,
-    fontSize: 16,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    marginBottom: 8,
-  },
-  passwordInput: {
-    paddingRight: 48,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: 14,
-    top: 16,
-    zIndex: 1,
-  },
-  errorText: {
-    color: Colors.primary,
-    fontSize: 13,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  authButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  authButtonDisabled: {
-    opacity: 0.7,
-  },
-  authButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700' as const,
-  },
-  switchBtn: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  switchText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  switchLink: {
-    color: Colors.secondary,
-    fontWeight: '600' as const,
-  },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -663,15 +327,19 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: Colors.text,
   },
+  profileDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
   profileEmail: {
     fontSize: 14,
     color: Colors.textSecondary,
-    marginTop: 2,
   },
   profilePhone: {
     fontSize: 13,
-    color: Colors.textMuted,
-    marginTop: 2,
+    color: Colors.textSecondary,
   },
   editBtn: {
     width: 40,

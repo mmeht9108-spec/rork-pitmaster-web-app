@@ -14,49 +14,73 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const fetchProfile = useCallback(async (userId: string, email: string, createdAt: string) => {
+    console.log('[Auth] Fetching profile for user:', userId);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('full_name, phone')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.log('[Auth] Profile fetch error (may not exist yet):', error.message);
+      return null;
+    }
+
+    return {
+      id: userId,
+      name: data.full_name ?? '',
+      phone: data.phone ?? '',
+      email,
+      createdAt,
+    } as User;
+  }, []);
+
+  const setUserFromSession = useCallback(async (currentSession: Session | null) => {
+    if (!currentSession?.user) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const { id, email, created_at, user_metadata } = currentSession.user;
+
+    const profile = await fetchProfile(id, email ?? '', created_at);
+    if (profile) {
+      setUser(profile);
+    } else {
+      setUser({
+        id,
+        name: user_metadata?.full_name ?? user_metadata?.name ?? '',
+        phone: user_metadata?.phone ?? '',
+        email: email ?? '',
+        createdAt: created_at,
+      });
+    }
+    setIsLoading(false);
+  }, [fetchProfile]);
+
   useEffect(() => {
     console.log('[Auth] Initializing Supabase auth listener...');
 
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       console.log('[Auth] Initial session:', currentSession ? 'found' : 'none');
       setSession(currentSession);
-      if (currentSession?.user) {
-        const meta = currentSession.user.user_metadata;
-        setUser({
-          id: currentSession.user.id,
-          name: meta?.name ?? '',
-          phone: meta?.phone ?? '',
-          email: currentSession.user.email ?? '',
-          createdAt: currentSession.user.created_at,
-        });
-      }
-      setIsLoading(false);
+      setUserFromSession(currentSession);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
         console.log('[Auth] Auth state changed:', _event);
         setSession(newSession);
-        if (newSession?.user) {
-          const meta = newSession.user.user_metadata;
-          setUser({
-            id: newSession.user.id,
-            name: meta?.name ?? '',
-            phone: meta?.phone ?? '',
-            email: newSession.user.email ?? '',
-            createdAt: newSession.user.created_at,
-          });
-        } else {
-          setUser(null);
-        }
-        setIsLoading(false);
+        setUserFromSession(newSession);
       }
     );
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [setUserFromSession]);
 
   const ordersQuery = useQuery({
     queryKey: ['orders', user?.id],
@@ -72,15 +96,15 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; name: string; phone?: string }) => {
+    mutationFn: async (data: { email: string; password: string; full_name: string; phone: string }) => {
       console.log('[Auth] Registering user:', data.email);
       const { data: authData, error } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
           data: {
-            name: data.name,
-            phone: data.phone ?? '',
+            full_name: data.full_name,
+            phone: data.phone,
           },
         },
       });
@@ -92,6 +116,19 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
       if (!authData.user) {
         throw new Error('Не удалось создать пользователя');
+      }
+
+      console.log('[Auth] User registered, creating profile in profiles table...');
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        full_name: data.full_name,
+        phone: data.phone,
+      });
+
+      if (profileError) {
+        console.error('[Auth] Profile insert error:', profileError.message);
+      } else {
+        console.log('[Auth] Profile created successfully');
       }
 
       console.log('[Auth] User registered successfully:', authData.user.id);
@@ -177,23 +214,37 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { name: string; phone?: string }) => {
       console.log('[Auth] Updating profile...');
+
       const { data: updatedData, error } = await supabase.auth.updateUser({
         data: {
-          name: data.name,
+          full_name: data.name,
           phone: data.phone ?? '',
         },
       });
 
       if (error) {
-        console.error('[Auth] Update profile error:', error.message);
+        console.error('[Auth] Update user metadata error:', error.message);
         throw new Error(error.message);
       }
 
-      const meta = updatedData.user.user_metadata;
+      if (session?.user?.id) {
+        const { error: profileUpdateError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: session.user.id,
+            full_name: data.name,
+            phone: data.phone ?? '',
+          });
+
+        if (profileUpdateError) {
+          console.error('[Auth] Profile table update error:', profileUpdateError.message);
+        }
+      }
+
       const updatedUser: User = {
         id: updatedData.user.id,
-        name: meta?.name ?? '',
-        phone: meta?.phone ?? '',
+        name: data.name,
+        phone: data.phone ?? '',
         email: updatedData.user.email ?? '',
         createdAt: updatedData.user.created_at,
       };
@@ -211,6 +262,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   return {
     user,
+    session,
     isLoggedIn,
     isLoading,
     orders,
