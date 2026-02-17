@@ -12,7 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { UserCircle, Mail, Lock, Eye, EyeOff, Phone } from 'lucide-react-native';
+import { UserCircle, Mail, Lock, Eye, EyeOff, Phone, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
@@ -99,6 +99,13 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <ChevronLeft size={24} color={Colors.text} />
+          </TouchableOpacity>
           <View style={styles.topSection}>
             <View style={styles.logoCircle}>
               <UserCircle size={32} color={Colors.secondary} />
@@ -247,6 +254,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 40,
+    paddingTop: 60,
+  },
+  backButton: {
+    position: 'absolute' as const,
+    top: 16,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   topSection: {
     alignItems: 'center',

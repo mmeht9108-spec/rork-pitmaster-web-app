@@ -39,13 +39,13 @@ type DeliveryMethod = 'pickup' | 'delivery';
 export default function CartScreen() {
   const router = useRouter();
   const { items, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart();
-  const { isLoggedIn, addOrder } = useAuth();
+  const { isLoggedIn, addOrder, user } = useAuth();
 
   const [step, setStep] = useState<1 | 2>(1);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const [name, setName] = useState<string>('');
-  const [phone, setPhone] = useState<string>('');
+  const [name, setName] = useState<string>(isLoggedIn && user ? user.name : '');
+  const [phone, setPhone] = useState<string>(isLoggedIn && user ? user.phone : '');
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('pickup');
   const [address, setAddress] = useState<string>('');
   const [comment, setComment] = useState<string>('');
