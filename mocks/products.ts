@@ -6,7 +6,6 @@ export const products: Product[] = [
     name: 'Брискет',
     description: 'Классический техасский брискет, томлёный 14 часов на дубовых щепках. Нежное мясо с хрустящей корочкой и насыщенным дымным ароматом.',
     price: 2500,
-    weight: '500 г',
     image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80',
     category: 'Говядина',
     isPopular: true,
