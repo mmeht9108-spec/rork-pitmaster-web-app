@@ -139,19 +139,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
       }
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: authData.user.id,
-          full_name: data.full_name,
-          phone: data.phone,
-        });
-
-      if (profileError) {
-        console.warn('[Auth] Profile insert error:', profileError.message);
-      } else {
-        console.log('[Auth] Profile created successfully');
-      }
+      console.log('[Auth] Skipping profiles table insert to avoid RLS violations');
 
       return authData;
     },
@@ -249,17 +237,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
 
       if (session?.user?.id) {
-        const { error: profileUpdateError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: session.user.id,
-            full_name: data.name,
-            phone: data.phone ?? '',
-          });
-
-        if (profileUpdateError) {
-          console.error('[Auth] Profile table update error:', profileUpdateError.message);
-        }
+        console.log('[Auth] Skipping profiles table update to avoid RLS violations');
       }
 
       const updatedUser: User = {
