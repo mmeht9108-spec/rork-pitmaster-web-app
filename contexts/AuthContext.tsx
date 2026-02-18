@@ -8,6 +8,7 @@ import { Session } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 
 const ORDERS_KEY = 'app_orders';
+const ORDERS_TABLE = 'orders';
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
@@ -86,14 +87,40 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const ordersQuery = useQuery({
     queryKey: ['orders', user?.id],
     queryFn: async () => {
-      if (!user) return [];
-      const stored = await AsyncStorage.getItem(ORDERS_KEY);
-      const allOrders: Order[] = stored ? JSON.parse(stored) : [];
-      return allOrders
-        .filter((o) => o.userPhone === user.phone || o.userName === user.name)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      if (!user?.id) return [];
+      console.log('[Orders] Fetching orders from Supabase for user:', user.id);
+      const { data, error } = await supabase
+        .from(ORDERS_TABLE)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('[Orders] Supabase fetch error, falling back to local cache:', error.message);
+        const stored = await AsyncStorage.getItem(ORDERS_KEY);
+        const allOrders: Order[] = stored ? JSON.parse(stored) : [];
+        return allOrders
+          .filter((o) => o.userId === user.id)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+
+      const orders: Order[] = (data ?? []).map((row) => ({
+        id: String(row.id ?? ''),
+        userId: String(row.user_id ?? ''),
+        items: (row.items ?? []) as CartItem[],
+        totalPrice: Number(row.total_price ?? 0),
+        deliveryMethod: (row.delivery_method ?? 'pickup') as 'pickup' | 'delivery',
+        address: row.address ?? undefined,
+        comment: row.comment ?? undefined,
+        userName: String(row.user_name ?? ''),
+        userPhone: String(row.user_phone ?? ''),
+        status: (row.status ?? 'pending') as Order['status'],
+        createdAt: String(row.created_at ?? new Date().toISOString()),
+      }));
+
+      return orders;
     },
-    enabled: !!user,
+    enabled: !!user?.id,
   });
 
   const registerMutation = useMutation({
@@ -196,8 +223,16 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       userName: string;
       userPhone: string;
     }) => {
+      if (!user?.id) {
+        throw new Error('Пользователь не авторизован');
+      }
+
+      const orderId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      const createdAt = new Date().toISOString();
+
       const order: Order = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+        id: orderId,
+        userId: user.id,
         items: orderData.items,
         totalPrice: orderData.totalPrice,
         deliveryMethod: orderData.deliveryMethod,
@@ -206,8 +241,27 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         userName: orderData.userName,
         userPhone: orderData.userPhone,
         status: 'pending',
-        createdAt: new Date().toISOString(),
+        createdAt,
       };
+
+      console.log('[Orders] Saving order to Supabase:', orderId);
+      const { error } = await supabase.from(ORDERS_TABLE).insert({
+        id: orderId,
+        user_id: user.id,
+        items: order.items,
+        total_price: order.totalPrice,
+        delivery_method: order.deliveryMethod,
+        address: order.address ?? null,
+        comment: order.comment ?? null,
+        user_name: order.userName,
+        user_phone: order.userPhone,
+        status: order.status,
+        created_at: createdAt,
+      });
+
+      if (error) {
+        console.warn('[Orders] Supabase insert error, saving to local cache:', error.message);
+      }
 
       const stored = await AsyncStorage.getItem(ORDERS_KEY);
       const allOrders: Order[] = stored ? JSON.parse(stored) : [];

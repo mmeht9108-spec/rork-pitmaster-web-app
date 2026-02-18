@@ -34,6 +34,7 @@ export interface User {
 
 export interface Order {
   id: string;
+  userId: string;
   items: CartItem[];
   totalPrice: number;
   deliveryMethod: 'pickup' | 'delivery';
