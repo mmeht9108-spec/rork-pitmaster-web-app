@@ -22,10 +22,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     const inAuthGroup = (segments[0] as string) === 'login' || (segments[0] as string) === 'register';
 
-    if (!isLoggedIn && !inAuthGroup) {
-      console.log('[AuthGate] Not logged in, redirecting to login');
-      router.replace('/login' as never);
-    } else if (isLoggedIn && inAuthGroup) {
+    if (isLoggedIn && inAuthGroup) {
       console.log('[AuthGate] Logged in, redirecting to home');
       router.replace('/(tabs)/(home)' as never);
     }
