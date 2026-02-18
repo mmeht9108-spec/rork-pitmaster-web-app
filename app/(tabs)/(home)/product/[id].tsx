@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { products } from '@/mocks/products';
 import { useCart } from '@/contexts/CartContext';
+import { formatGrams, getPricePerKg, getSubtotal, parseWeightGrams } from '@/utils/pricing';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,10 +24,23 @@ export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { addToCart, getItemQuantity } = useCart();
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<number>(100);
 
   const product = products.find((p) => p.id === id);
   const cartQuantity = product ? getItemQuantity(product.id) : 0;
+
+  const baseWeightGrams = useMemo(
+    () => (product ? parseWeightGrams(product.weight) : 0),
+    [product]
+  );
+
+  useEffect(() => {
+    if (!product) {
+      return;
+    }
+    const rounded = Math.max(100, Math.round(baseWeightGrams / 100) * 100);
+    setQuantity(rounded > 0 ? rounded : 100);
+  }, [product, baseWeightGrams]);
 
   if (!product) {
     return (
@@ -40,7 +54,7 @@ export default function ProductDetailScreen() {
     if (Platform.OS !== 'web') {
       Haptics.selectionAsync();
     }
-    setQuantity((prev) => Math.max(1, prev + delta));
+    setQuantity((prev) => Math.max(100, prev + delta));
   };
 
   const handleAddToCart = () => {
@@ -74,6 +88,7 @@ export default function ProductDetailScreen() {
 
           <View style={styles.metaRow}>
             <Text style={styles.weight}>{product.weight}</Text>
+            <Text style={styles.pricePerKg}>{getPricePerKg(product.price, baseWeightGrams)} ₽/кг</Text>
           </View>
 
           <View style={styles.nutriRow}>
@@ -102,18 +117,18 @@ export default function ProductDetailScreen() {
           <View style={styles.divider} />
 
           <View style={styles.quantitySection}>
-            <Text style={styles.quantityLabel}>Количество</Text>
+            <Text style={styles.quantityLabel}>Вес</Text>
             <View style={styles.quantityControls}>
               <TouchableOpacity
                 style={styles.quantityButton}
-                onPress={() => handleQuantityChange(-1)}
+                onPress={() => handleQuantityChange(-100)}
               >
                 <Minus size={20} color={Colors.text} />
               </TouchableOpacity>
-              <Text style={styles.quantityValue}>{quantity}</Text>
+              <Text style={styles.quantityValue}>{formatGrams(quantity)}</Text>
               <TouchableOpacity
                 style={styles.quantityButton}
-                onPress={() => handleQuantityChange(1)}
+                onPress={() => handleQuantityChange(100)}
               >
                 <Plus size={20} color={Colors.text} />
               </TouchableOpacity>
@@ -124,8 +139,10 @@ export default function ProductDetailScreen() {
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
         <View style={styles.priceContainer}>
-          <Text style={styles.priceLabel}>Итого</Text>
-          <Text style={styles.price}>{product.price * quantity} ₽</Text>
+          <Text style={styles.priceLabel}>Подытог</Text>
+          <Text style={styles.price}>
+            {getSubtotal(product.price, baseWeightGrams, quantity)} ₽
+          </Text>
         </View>
         <TouchableOpacity
           style={styles.addButton}
@@ -201,6 +218,11 @@ const styles = StyleSheet.create({
   weight: {
     color: Colors.textSecondary,
     fontSize: 15,
+  },
+  pricePerKg: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '700' as const,
   },
   nutriRow: {
     flexDirection: 'row' as const,

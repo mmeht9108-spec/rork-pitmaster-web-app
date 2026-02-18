@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -33,12 +33,21 @@ import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatGrams, getPricePerKg, getSubtotal, parseWeightGrams } from '@/utils/pricing';
 
 type DeliveryMethod = 'pickup' | 'delivery';
 
 export default function CartScreen() {
   const router = useRouter();
   const { items, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart();
+  const sanitizedItems = useMemo(
+    () =>
+      items.map((item) => {
+        const rounded = Math.max(100, Math.round(item.quantity / 100) * 100);
+        return { ...item, quantity: rounded };
+      }),
+    [items]
+  );
   const { isLoggedIn, addOrder, user } = useAuth();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -72,7 +81,8 @@ export default function CartScreen() {
     if (Platform.OS !== 'web') {
       Haptics.selectionAsync();
     }
-    updateQuantity(productId, currentQty + delta);
+    const nextQty = currentQty + delta;
+    updateQuantity(productId, nextQty);
   };
 
   const handleRemove = (productId: string) => {
@@ -135,9 +145,13 @@ export default function CartScreen() {
       return;
     }
 
-    const orderLines = items.map(
-      (item) => `• ${item.product.name} x${item.quantity} — ${item.product.price * item.quantity} ₽`
-    ).join('\n');
+    const orderLines = sanitizedItems
+      .map((item) => {
+        const baseWeightGrams = parseWeightGrams(item.product.weight);
+        const subtotal = getSubtotal(item.product.price, baseWeightGrams, item.quantity);
+        return `• ${item.product.name} ${formatGrams(item.quantity)} — ${subtotal} ₽`;
+      })
+      .join('\n');
 
     const deliveryLabel = deliveryMethod === 'pickup' ? '🏪 Самовывоз' : '🚚 Доставка';
 
@@ -200,9 +214,11 @@ export default function CartScreen() {
         comment.trim() ? `<p><strong>💬 Комментарий:</strong> ${comment.trim()}</p>` : '',
         '<h3>📦 Заказ:</h3>',
         '<ul>',
-        ...items.map(item =>
-          `<li>${item.product.name} x${item.quantity} — ${item.product.price * item.quantity} ₽</li>`
-        ),
+        ...sanitizedItems.map((item) => {
+          const baseWeightGrams = parseWeightGrams(item.product.weight);
+          const subtotal = getSubtotal(item.product.price, baseWeightGrams, item.quantity);
+          return `<li>${item.product.name} ${formatGrams(item.quantity)} — ${subtotal} ₽</li>`;
+        }),
         '</ul>',
         `<p><strong>💰 Итого: ${totalPrice} ₽</strong></p>`,
       ].filter(Boolean).join('\n');
@@ -233,7 +249,7 @@ export default function CartScreen() {
     if (isLoggedIn) {
       try {
         await addOrder({
-          items,
+          items: sanitizedItems,
           totalPrice,
           deliveryMethod,
           address: deliveryMethod === 'delivery' ? address.trim() : undefined,
@@ -386,7 +402,7 @@ export default function CartScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {items.map((item) => (
+        {sanitizedItems.map((item) => (
           <View key={item.product.id} style={styles.cartItem}>
             <Image
               source={{ uri: item.product.image }}
@@ -404,25 +420,37 @@ export default function CartScreen() {
                   <Trash2 size={18} color={Colors.textMuted} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.itemWeight}>{item.product.weight}</Text>
-              <View style={styles.itemFooter}>
-                <Text style={styles.itemPrice}>
-                  {item.product.price * item.quantity} ₽
+              <View style={styles.itemMetaRow}>
+                <Text style={styles.itemWeight}>{item.product.weight}</Text>
+                <Text style={styles.itemPricePerKg}>
+                  {getPricePerKg(item.product.price, parseWeightGrams(item.product.weight))} ₽/кг
                 </Text>
+              </View>
+              <View style={styles.itemFooter}>
+                <View>
+                  <Text style={styles.itemPrice}>
+                    {getSubtotal(
+                      item.product.price,
+                      parseWeightGrams(item.product.weight),
+                      item.quantity
+                    )} ₽
+                  </Text>
+                  <Text style={styles.itemSubtotalLabel}>Подытог</Text>
+                </View>
                 <View style={styles.quantityControls}>
                   <TouchableOpacity
                     style={styles.qtyButton}
                     onPress={() =>
-                      handleQuantityChange(item.product.id, -1, item.quantity)
+                      handleQuantityChange(item.product.id, -100, item.quantity)
                     }
                   >
                     <Minus size={16} color={Colors.text} />
                   </TouchableOpacity>
-                  <Text style={styles.qtyValue}>{item.quantity}</Text>
+                  <Text style={styles.qtyValue}>{formatGrams(item.quantity)}</Text>
                   <TouchableOpacity
                     style={styles.qtyButton}
                     onPress={() =>
-                      handleQuantityChange(item.product.id, 1, item.quantity)
+                      handleQuantityChange(item.product.id, 100, item.quantity)
                     }
                   >
                     <Plus size={16} color={Colors.text} />
@@ -434,13 +462,17 @@ export default function CartScreen() {
         ))}
 
         <View style={styles.summaryCard}>
-          {items.map((item) => (
+          {sanitizedItems.map((item) => (
             <View key={item.product.id} style={styles.summaryRow}>
               <Text style={styles.summaryName} numberOfLines={1}>
-                {item.product.name} × {item.quantity}
+                {item.product.name} × {formatGrams(item.quantity)}
               </Text>
               <Text style={styles.summaryPrice}>
-                {item.product.price * item.quantity} ₽
+                {getSubtotal(
+                  item.product.price,
+                  parseWeightGrams(item.product.weight),
+                  item.quantity
+                )} ₽
               </Text>
             </View>
           ))}
@@ -722,6 +754,22 @@ const styles = StyleSheet.create({
   itemWeight: {
     fontSize: 13,
     color: Colors.textMuted,
+  },
+  itemMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  itemPricePerKg: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600' as const,
+  },
+  itemSubtotalLabel: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600' as const,
     marginTop: 2,
   },
   itemFooter: {

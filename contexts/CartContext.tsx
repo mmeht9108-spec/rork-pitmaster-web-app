@@ -1,11 +1,12 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useCallback, useMemo } from 'react';
 import { Product, CartItem } from '@/types/product';
+import { getSubtotal, parseWeightGrams } from '@/utils/pricing';
 
 export const [CartProvider, useCart] = createContextHook(() => {
   const [items, setItems] = useState<CartItem[]>([]);
 
-  const addToCart = useCallback((product: Product, quantity: number = 1) => {
+  const addToCart = useCallback((product: Product, quantity: number = 100) => {
     setItems((prev) => {
       const existingIndex = prev.findIndex((item) => item.product.id === product.id);
       if (existingIndex >= 0) {
@@ -40,13 +41,14 @@ export const [CartProvider, useCart] = createContextHook(() => {
     setItems([]);
   }, []);
 
-  const totalItems = useMemo(
-    () => items.reduce((sum, item) => sum + item.quantity, 0),
-    [items]
-  );
+  const totalItems = useMemo(() => items.length, [items]);
 
   const totalPrice = useMemo(
-    () => items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+    () =>
+      items.reduce((sum, item) => {
+        const baseWeightGrams = parseWeightGrams(item.product.weight);
+        return sum + getSubtotal(item.product.price, baseWeightGrams, item.quantity);
+      }, 0),
     [items]
   );
 

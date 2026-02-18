@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { Product } from '@/types/product';
 import Colors from '@/constants/colors';
 import { useCart } from '@/contexts/CartContext';
+import { formatGrams, getPricePerKg, getSubtotal, parseWeightGrams } from '@/utils/pricing';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
@@ -26,23 +27,38 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
   const { addToCart, getItemQuantity, updateQuantity } = useCart();
   const quantity = getItemQuantity(product.id);
 
+  const baseWeightGrams = useMemo(() => parseWeightGrams(product.weight), [product.weight]);
+  const pricePerKg = useMemo(
+    () => getPricePerKg(product.price, baseWeightGrams),
+    [product.price, baseWeightGrams]
+  );
+  const subtotal = useMemo(() => {
+    const selectedGrams = quantity > 0 ? quantity : baseWeightGrams;
+    return getSubtotal(product.price, baseWeightGrams, selectedGrams);
+  }, [product.price, baseWeightGrams, quantity]);
+
   const handleAddToCart = () => {
     console.log('ProductCard add to cart', { productId: product.id, quantityBefore: quantity });
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    addToCart(product);
+    if (quantity <= 0) {
+      addToCart(product, 100);
+      return;
+    }
+    updateQuantity(product.id, quantity + 100);
   };
 
   const handleDecrease = () => {
     console.log('ProductCard decrease quantity', { productId: product.id, quantityBefore: quantity });
-    if (quantity <= 0) {
+    if (quantity <= 100) {
+      updateQuantity(product.id, 0);
       return;
     }
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    updateQuantity(product.id, quantity - 1);
+    updateQuantity(product.id, quantity - 100);
   };
 
   return (
@@ -62,7 +78,7 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
         )}
         {quantity > 0 && (
           <View style={styles.quantityBadge}>
-            <Text style={styles.quantityText}>{quantity} шт.</Text>
+            <Text style={styles.quantityText}>{formatGrams(quantity)}</Text>
           </View>
         )}
       </View>
@@ -71,6 +87,7 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
           {product.name}
         </Text>
         <Text style={styles.weight}>{product.weight}</Text>
+        <Text style={styles.pricePerKg}>{pricePerKg} ₽/кг</Text>
         <View style={styles.nutriRow}>
           <Text style={styles.nutriLabel}>Б <Text style={styles.nutriValue}>{product.proteins}</Text></Text>
           <Text style={styles.nutriLabel}>Ж <Text style={styles.nutriValue}>{product.fats}</Text></Text>
@@ -79,7 +96,10 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
         <View style={styles.footer}>
           <View style={styles.priceBlock}>
             <Text style={styles.price}>{product.price} ₽</Text>
-            {quantity > 0 && <Text style={styles.quantityLabel}>{quantity} шт.</Text>}
+            <Text style={styles.subtotalLabel}>{subtotal} ₽</Text>
+            {quantity > 0 && (
+              <Text style={styles.quantityLabel}>{formatGrams(quantity)}</Text>
+            )}
           </View>
           <View style={styles.controls}>
             <TouchableOpacity
@@ -141,7 +161,7 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     backgroundColor: Colors.primary,
-    width: 24,
+    paddingHorizontal: 6,
     height: 24,
     borderRadius: 12,
     justifyContent: 'center',
@@ -149,7 +169,7 @@ const styles = StyleSheet.create({
   },
   quantityText: {
     color: Colors.text,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700' as const,
   },
   content: {
@@ -164,7 +184,13 @@ const styles = StyleSheet.create({
   weight: {
     color: Colors.textMuted,
     fontSize: 12,
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  pricePerKg: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600' as const,
+    marginBottom: 6,
   },
   nutriRow: {
     flexDirection: 'row' as const,
@@ -192,6 +218,11 @@ const styles = StyleSheet.create({
   price: {
     color: Colors.text,
     fontSize: 16,
+    fontWeight: '700' as const,
+  },
+  subtotalLabel: {
+    color: Colors.primary,
+    fontSize: 13,
     fontWeight: '700' as const,
   },
   quantityLabel: {

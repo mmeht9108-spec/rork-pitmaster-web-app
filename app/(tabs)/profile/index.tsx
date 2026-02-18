@@ -31,6 +31,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatGrams, getSubtotal, parseWeightGrams } from '@/utils/pricing';
 import { Order } from '@/types/product';
 
 const STATUS_MAP: Record<Order['status'], { label: string; color: string }> = {
@@ -302,11 +303,15 @@ export default function ProfileScreen() {
                               {item.product.name}
                             </Text>
                             <Text style={styles.orderItemQty}>
-                              {item.quantity} шт. × {item.product.price} ₽
+                              {formatGrams(item.quantity)} × {item.product.price} ₽
                             </Text>
                           </View>
                           <Text style={styles.orderItemPrice}>
-                            {item.product.price * item.quantity} ₽
+                            {getSubtotal(
+                              item.product.price,
+                              parseWeightGrams(item.product.weight),
+                              item.quantity
+                            )} ₽
                           </Text>
                         </View>
                       ))}
