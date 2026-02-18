@@ -24,7 +24,10 @@ import {
   Edit3,
   Check,
   X,
+  LogIn,
+  UserPlus,
 } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +42,7 @@ const STATUS_MAP: Record<Order['status'], { label: string; color: string }> = {
 };
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const {
     user,
     orders,
@@ -73,6 +77,16 @@ export default function ProfileScreen() {
     setIsEditing(true);
   }, [user]);
 
+  const handleOpenLogin = useCallback(() => {
+    router.push('/login' as never);
+    if (Platform.OS !== 'web') Haptics.selectionAsync();
+  }, [router]);
+
+  const handleOpenRegister = useCallback(() => {
+    router.push('/register' as never);
+    if (Platform.OS !== 'web') Haptics.selectionAsync();
+  }, [router]);
+
   const handleSaveProfile = useCallback(async () => {
     if (!editName.trim()) return;
     try {
@@ -105,7 +119,40 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.profileCard}>
+      {!user ? (
+        <View style={styles.authCard}>
+          <View style={styles.authHeaderRow}>
+            <View style={styles.authIconWrap}>
+              <UserPlus size={22} color={Colors.primary} />
+            </View>
+            <View style={styles.authHeaderText}>
+              <Text style={styles.authTitle}>Личный кабинет</Text>
+              <Text style={styles.authSubtitle}>Войдите или зарегистрируйтесь, чтобы сохранить данные</Text>
+            </View>
+          </View>
+          <View style={styles.authButtons}>
+            <TouchableOpacity
+              style={styles.authPrimaryBtn}
+              onPress={handleOpenLogin}
+              activeOpacity={0.85}
+              testID="profile-login"
+            >
+              <LogIn size={18} color="#fff" />
+              <Text style={styles.authPrimaryText}>Войти</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.authSecondaryBtn}
+              onPress={handleOpenRegister}
+              activeOpacity={0.85}
+              testID="profile-register"
+            >
+              <UserPlus size={18} color={Colors.primary} />
+              <Text style={styles.authSecondaryText}>Зарегистрироваться</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.profileCard}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarSmall}>
             <Text style={styles.avatarText}>
@@ -174,112 +221,117 @@ export default function ProfileScreen() {
           )}
         </View>
       </View>
-
-      <View style={styles.sectionHeader}>
-        <Package size={20} color={Colors.primary} />
-        <Text style={styles.sectionTitle}>История заказов</Text>
-      </View>
-
-      {ordersLoading ? (
-        <View style={styles.ordersLoading}>
-          <ActivityIndicator color={Colors.primary} />
-        </View>
-      ) : orders.length === 0 ? (
-        <View style={styles.emptyOrders}>
-          <View style={styles.emptyIcon}>
-            <Package size={40} color={Colors.textMuted} />
-          </View>
-          <Text style={styles.emptyTitle}>Заказов пока нет</Text>
-          <Text style={styles.emptySubtitle}>Ваши заказы будут отображаться здесь</Text>
-        </View>
-      ) : (
-        orders.map((order) => {
-          const isExpanded = expandedOrder === order.id;
-          const statusInfo = STATUS_MAP[order.status];
-          return (
-            <TouchableOpacity
-              key={order.id}
-              style={styles.orderCard}
-              onPress={() => toggleOrder(order.id)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.orderTop}>
-                <View style={styles.orderMeta}>
-                  <Text style={styles.orderNumber}>
-                    Заказ #{order.id.slice(-6).toUpperCase()}
-                  </Text>
-                  <View style={styles.orderDateRow}>
-                    <Clock size={13} color={Colors.textMuted} />
-                    <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
-                  </View>
-                </View>
-                <View style={styles.orderRight}>
-                  <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '22' }]}>
-                    <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                      {statusInfo.label}
-                    </Text>
-                  </View>
-                  <ChevronRight
-                    size={18}
-                    color={Colors.textMuted}
-                    style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.orderSummaryRow}>
-                <View style={styles.deliveryBadge}>
-                  {order.deliveryMethod === 'pickup' ? (
-                    <Store size={14} color={Colors.textSecondary} />
-                  ) : (
-                    <Truck size={14} color={Colors.textSecondary} />
-                  )}
-                  <Text style={styles.deliveryText}>
-                    {order.deliveryMethod === 'pickup' ? 'Самовывоз' : 'Доставка'}
-                  </Text>
-                </View>
-                <Text style={styles.orderTotal}>{order.totalPrice} ₽</Text>
-              </View>
-
-              {isExpanded && (
-                <View style={styles.orderDetails}>
-                  <View style={styles.orderDivider} />
-                  {order.items.map((item) => (
-                    <View key={item.product.id} style={styles.orderItem}>
-                      <Image source={{ uri: item.product.image }} style={styles.orderItemImage} />
-                      <View style={styles.orderItemInfo}>
-                        <Text style={styles.orderItemName} numberOfLines={1}>
-                          {item.product.name}
-                        </Text>
-                        <Text style={styles.orderItemQty}>
-                          {item.quantity} шт. × {item.product.price} ₽
-                        </Text>
-                      </View>
-                      <Text style={styles.orderItemPrice}>
-                        {item.product.price * item.quantity} ₽
-                      </Text>
-                    </View>
-                  ))}
-                  {order.deliveryMethod === 'delivery' && order.address ? (
-                    <View style={styles.orderAddressRow}>
-                      <MapPin size={14} color={Colors.textMuted} />
-                      <Text style={styles.orderAddress}>{order.address}</Text>
-                    </View>
-                  ) : null}
-                  {order.comment ? (
-                    <Text style={styles.orderComment}>💬 {order.comment}</Text>
-                  ) : null}
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })
       )}
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
-        <LogOut size={20} color={Colors.primary} />
-        <Text style={styles.logoutText}>Выйти из аккаунта</Text>
-      </TouchableOpacity>
+      {user ? (
+        <>
+          <View style={styles.sectionHeader}>
+            <Package size={20} color={Colors.primary} />
+            <Text style={styles.sectionTitle}>История заказов</Text>
+          </View>
+
+          {ordersLoading ? (
+            <View style={styles.ordersLoading}>
+              <ActivityIndicator color={Colors.primary} />
+            </View>
+          ) : orders.length === 0 ? (
+            <View style={styles.emptyOrders}>
+              <View style={styles.emptyIcon}>
+                <Package size={40} color={Colors.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>Заказов пока нет</Text>
+              <Text style={styles.emptySubtitle}>Ваши заказы будут отображаться здесь</Text>
+            </View>
+          ) : (
+            orders.map((order) => {
+              const isExpanded = expandedOrder === order.id;
+              const statusInfo = STATUS_MAP[order.status];
+              return (
+                <TouchableOpacity
+                  key={order.id}
+                  style={styles.orderCard}
+                  onPress={() => toggleOrder(order.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.orderTop}>
+                    <View style={styles.orderMeta}>
+                      <Text style={styles.orderNumber}>
+                        Заказ #{order.id.slice(-6).toUpperCase()}
+                      </Text>
+                      <View style={styles.orderDateRow}>
+                        <Clock size={13} color={Colors.textMuted} />
+                        <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.orderRight}>
+                      <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '22' }]}>
+                        <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                          {statusInfo.label}
+                        </Text>
+                      </View>
+                      <ChevronRight
+                        size={18}
+                        color={Colors.textMuted}
+                        style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.orderSummaryRow}>
+                    <View style={styles.deliveryBadge}>
+                      {order.deliveryMethod === 'pickup' ? (
+                        <Store size={14} color={Colors.textSecondary} />
+                      ) : (
+                        <Truck size={14} color={Colors.textSecondary} />
+                      )}
+                      <Text style={styles.deliveryText}>
+                        {order.deliveryMethod === 'pickup' ? 'Самовывоз' : 'Доставка'}
+                      </Text>
+                    </View>
+                    <Text style={styles.orderTotal}>{order.totalPrice} ₽</Text>
+                  </View>
+
+                  {isExpanded && (
+                    <View style={styles.orderDetails}>
+                      <View style={styles.orderDivider} />
+                      {order.items.map((item) => (
+                        <View key={item.product.id} style={styles.orderItem}>
+                          <Image source={{ uri: item.product.image }} style={styles.orderItemImage} />
+                          <View style={styles.orderItemInfo}>
+                            <Text style={styles.orderItemName} numberOfLines={1}>
+                              {item.product.name}
+                            </Text>
+                            <Text style={styles.orderItemQty}>
+                              {item.quantity} шт. × {item.product.price} ₽
+                            </Text>
+                          </View>
+                          <Text style={styles.orderItemPrice}>
+                            {item.product.price * item.quantity} ₽
+                          </Text>
+                        </View>
+                      ))}
+                      {order.deliveryMethod === 'delivery' && order.address ? (
+                        <View style={styles.orderAddressRow}>
+                          <MapPin size={14} color={Colors.textMuted} />
+                          <Text style={styles.orderAddress}>{order.address}</Text>
+                        </View>
+                      ) : null}
+                      {order.comment ? (
+                        <Text style={styles.orderComment}>💬 {order.comment}</Text>
+                      ) : null}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <LogOut size={20} color={Colors.primary} />
+            <Text style={styles.logoutText}>Выйти из аккаунта</Text>
+          </TouchableOpacity>
+        </>
+      ) : null}
 
       <View style={styles.bottomPadding} />
     </ScrollView>
@@ -300,6 +352,71 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 24,
+  },
+  authCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+  },
+  authHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  authIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authHeaderText: {
+    flex: 1,
+  },
+  authTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: Colors.text,
+  },
+  authSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
+  authButtons: {
+    gap: 10,
+  },
+  authPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  authPrimaryText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  authSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  authSecondaryText: {
+    color: Colors.primary,
+    fontSize: 15,
+    fontWeight: '600' as const,
   },
   profileHeader: {
     flexDirection: 'row',
