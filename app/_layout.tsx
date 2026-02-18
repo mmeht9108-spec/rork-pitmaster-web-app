@@ -20,11 +20,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = (segments[0] as string) === 'login' || (segments[0] as string) === 'register';
+    const rootSegment = String(segments[0] ?? '');
+    const inAuthGroup = rootSegment === 'login' || rootSegment === 'register';
 
     if (isLoggedIn && inAuthGroup) {
       console.log('[AuthGate] Logged in, redirecting to home');
       router.replace('/(tabs)/(home)' as never);
+      return;
+    }
+
+    if (!isLoggedIn && !inAuthGroup) {
+      console.log('[AuthGate] Not logged in, redirecting to login');
+      router.replace('/login' as never);
     }
   }, [isLoggedIn, isLoading, segments, router]);
 
