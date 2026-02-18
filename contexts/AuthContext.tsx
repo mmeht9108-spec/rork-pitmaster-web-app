@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, Order, CartItem } from '@/types/product';
 import { Session } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 
 const ORDERS_KEY = 'app_orders';
 
@@ -98,6 +99,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const registerMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; full_name: string; phone: string }) => {
       console.log('[Auth] Registering user:', data.email);
+      const emailRedirectTo = Linking.createURL('/login');
       const { data: authData, error } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -106,6 +108,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
             full_name: data.full_name,
             phone: data.phone,
           },
+          emailRedirectTo,
         },
       });
 
@@ -119,6 +122,22 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
 
       console.log('[Auth] User registered successfully:', authData.user.id);
+
+      if (!authData.session) {
+        console.warn('[Auth] No session after signUp. Attempting to resend confirmation email...');
+        const { error: resendError } = await supabase.auth.resend({
+          type: 'signup',
+          email: data.email,
+          options: {
+            emailRedirectTo,
+          },
+        });
+        if (resendError) {
+          console.warn('[Auth] Resend confirmation email error:', resendError.message);
+        } else {
+          console.log('[Auth] Confirmation email resent');
+        }
+      }
 
       const { error: profileError } = await supabase
         .from('profiles')
