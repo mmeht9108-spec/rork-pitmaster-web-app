@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { Product } from '@/types/product';
 import Colors from '@/constants/colors';
 import { useCart } from '@/contexts/CartContext';
-import { formatGrams, getPricePerKg, getSubtotal, parseWeightGrams } from '@/utils/pricing';
+import { getPricePerKg, getSubtotal, parseWeightGrams } from '@/utils/pricing';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
@@ -33,88 +33,88 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
     [product.price, baseWeightGrams]
   );
   const subtotal = useMemo(() => {
-    const selectedGrams = quantity > 0 ? quantity : baseWeightGrams;
-    return getSubtotal(product.price, baseWeightGrams, selectedGrams);
+    if (quantity <= 0) return 0;
+    return getSubtotal(product.price, baseWeightGrams, quantity);
   }, [product.price, baseWeightGrams, quantity]);
 
-  const handleAddToCart = () => {
-    console.log('ProductCard add to cart', { productId: product.id, quantityBefore: quantity });
+  const handleAdd = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     if (quantity <= 0) {
       addToCart(product, 100);
-      return;
+    } else {
+      updateQuantity(product.id, quantity + 100);
     }
-    updateQuantity(product.id, quantity + 100);
   };
 
   const handleDecrease = () => {
-    console.log('ProductCard decrease quantity', { productId: product.id, quantityBefore: quantity });
-    if (quantity <= 100) {
-      updateQuantity(product.id, 0);
-      return;
-    }
+    if (quantity <= 0) return;
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    updateQuantity(product.id, quantity - 100);
+    if (quantity <= 100) {
+      updateQuantity(product.id, 0);
+    } else {
+      updateQuantity(product.id, quantity - 100);
+    }
   };
 
   return (
     <TouchableOpacity
       style={styles.container}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       testID={`product-card-${product.id}`}
     >
       <View style={styles.imageContainer}>
         <Image source={{ uri: product.image }} style={styles.image} />
         {product.isPopular && (
           <View style={styles.popularBadge}>
-            <Flame size={12} color={Colors.secondary} />
+            <Flame size={11} color={Colors.secondary} />
             <Text style={styles.popularText}>Хит</Text>
           </View>
         )}
         {quantity > 0 && (
           <View style={styles.quantityBadge}>
-            <Text style={styles.quantityText}>{formatGrams(quantity)}</Text>
+            <Text style={styles.quantityBadgeText}>{quantity} г</Text>
           </View>
         )}
       </View>
+
       <View style={styles.content}>
-        <Text style={styles.name} numberOfLines={1}>
+        <Text style={styles.name} numberOfLines={2}>
           {product.name}
         </Text>
-        <Text style={styles.weight}>{product.weight}</Text>
         <Text style={styles.pricePerKg}>{pricePerKg} ₽/кг</Text>
-        <View style={styles.nutriRow}>
-          <Text style={styles.nutriLabel}>Б <Text style={styles.nutriValue}>{product.proteins}</Text></Text>
-          <Text style={styles.nutriLabel}>Ж <Text style={styles.nutriValue}>{product.fats}</Text></Text>
-          <Text style={styles.nutriLabel}>У <Text style={styles.nutriValue}>{product.carbs}</Text></Text>
-        </View>
+
         <View style={styles.footer}>
-          <View style={styles.priceBlock}>
-            <Text style={styles.price}>{product.price} ₽</Text>
-            <Text style={styles.subtotalLabel}>{subtotal} ₽</Text>
-            {quantity > 0 && (
-              <Text style={styles.quantityLabel}>{formatGrams(quantity)}</Text>
+          <View style={styles.leftBlock}>
+            {quantity > 0 ? (
+              <>
+                <Text style={styles.selectedWeight}>{quantity} г</Text>
+                <Text style={styles.subtotal}>{subtotal} ₽</Text>
+              </>
+            ) : (
+              <Text style={styles.basePrice}>{product.price} ₽</Text>
             )}
           </View>
+
           <View style={styles.controls}>
             <TouchableOpacity
-              style={[styles.controlButton, quantity <= 0 ? styles.controlButtonDisabled : null]}
+              style={[styles.btn, styles.btnMinus, quantity <= 0 && styles.btnDisabled]}
               onPress={handleDecrease}
+              disabled={quantity <= 0}
               testID={`remove-from-cart-${product.id}`}
             >
-              <Minus size={16} color={Colors.text} />
+              <Minus size={14} color={quantity <= 0 ? Colors.textMuted : Colors.text} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.controlButton}
-              onPress={handleAddToCart}
+              style={[styles.btn, styles.btnPlus]}
+              onPress={handleAdd}
               testID={`add-to-cart-${product.id}`}
             >
-              <Plus size={16} color={Colors.text} />
+              <Plus size={14} color={Colors.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -138,6 +138,7 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   popularBadge: {
     position: 'absolute',
@@ -145,105 +146,91 @@ const styles = StyleSheet.create({
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
   },
   popularText: {
     color: Colors.secondary,
-    fontSize: 11,
-    fontWeight: '600' as const,
+    fontSize: 10,
+    fontWeight: '700' as const,
   },
   quantityBadge: {
     position: 'absolute',
     top: 8,
     right: 8,
     backgroundColor: Colors.primary,
-    paddingHorizontal: 6,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
-  quantityText: {
+  quantityBadgeText: {
     color: Colors.text,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700' as const,
   },
   content: {
-    padding: 12,
+    padding: 10,
+    paddingTop: 8,
   },
   name: {
     color: Colors.text,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600' as const,
-    marginBottom: 2,
-  },
-  weight: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    marginBottom: 2,
+    lineHeight: 18,
+    marginBottom: 3,
   },
   pricePerKg: {
     color: Colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600' as const,
-    marginBottom: 6,
-  },
-  nutriRow: {
-    flexDirection: 'row' as const,
-    gap: 8,
-    marginBottom: 8,
-  },
-  nutriLabel: {
-    color: Colors.textMuted,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '500' as const,
-  },
-  nutriValue: {
-    color: Colors.textSecondary,
-    fontWeight: '600' as const,
+    marginBottom: 8,
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  priceBlock: {
-    gap: 4,
+  leftBlock: {
+    flex: 1,
+    gap: 1,
   },
-  price: {
-    color: Colors.text,
-    fontSize: 16,
-    fontWeight: '700' as const,
-  },
-  subtotalLabel: {
-    color: Colors.primary,
-    fontSize: 13,
-    fontWeight: '700' as const,
-  },
-  quantityLabel: {
+  selectedWeight: {
     color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600' as const,
+    fontSize: 11,
+    fontWeight: '500' as const,
+  },
+  subtotal: {
+    color: Colors.secondary,
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  basePrice: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: '700' as const,
   },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
-  controlButton: {
-    backgroundColor: Colors.primary,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  btn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  controlButtonDisabled: {
-    opacity: 0.5,
+  btnPlus: {
+    backgroundColor: Colors.primary,
+  },
+  btnMinus: {
+    backgroundColor: Colors.surfaceLight,
+  },
+  btnDisabled: {
+    opacity: 0.35,
   },
 });
