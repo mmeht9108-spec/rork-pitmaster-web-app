@@ -2,12 +2,14 @@ import React, { useRef, useEffect } from 'react';
 import { TouchableOpacity, Text, StyleSheet, View, Animated, Platform } from 'react-native';
 import { ShoppingCart, ArrowRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '@/constants/colors';
 import { useCart } from '@/contexts/CartContext';
 
 export default function CartButton() {
   const router = useRouter();
   const { totalItems, totalPrice } = useCart();
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(100)).current;
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function CartButton() {
     <Animated.View
       style={[
         styles.wrapper,
-        { transform: [{ translateY: slideAnim }] },
+        { bottom: (Platform.OS === 'web' ? 60 : 49) + insets.bottom + 8, transform: [{ translateY: slideAnim }] },
       ]}
     >
       <TouchableOpacity
@@ -55,7 +57,6 @@ export default function CartButton() {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    bottom: Platform.OS === 'web' ? 70 : 90,
     left: 16,
     right: 16,
     zIndex: 100,

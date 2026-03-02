@@ -90,14 +90,8 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
 
         <View style={styles.footer}>
           <View style={styles.leftBlock}>
-            {quantity > 0 ? (
-              <>
-                <Text style={styles.selectedWeight}>{quantity} г</Text>
-                <Text style={styles.subtotal}>{subtotal} ₽</Text>
-              </>
-            ) : (
-              <Text style={styles.basePrice}>{product.price} ₽</Text>
-            )}
+            <Text style={styles.selectedWeight}>{quantity > 0 ? `${quantity} г` : '0 г'}</Text>
+            <Text style={[styles.subtotal, quantity <= 0 && styles.subtotalZero]}>{quantity > 0 ? `${subtotal} ₽` : '0 ₽'}</Text>
           </View>
 
           <View style={styles.controls}>
@@ -207,10 +201,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
   },
-  basePrice: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '700' as const,
+  subtotalZero: {
+    color: Colors.textMuted,
   },
   controls: {
     flexDirection: 'row',
