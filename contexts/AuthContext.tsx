@@ -65,17 +65,41 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   useEffect(() => {
     console.log('[Auth] Initializing Supabase auth listener...');
 
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    void supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
+      if (error) {
+        console.warn('[Auth] getSession error:', error.message);
+        if (error.message.includes('Refresh Token') || error.message.includes('refresh_token')) {
+          console.log('[Auth] Invalid refresh token detected, clearing session...');
+          void supabase.auth.signOut().catch(() => {});
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+      }
       console.log('[Auth] Initial session:', currentSession ? 'found' : 'none');
       setSession(currentSession);
-      setUserFromSession(currentSession);
+      void setUserFromSession(currentSession);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
         console.log('[Auth] Auth state changed:', _event);
+        if (_event === 'TOKEN_REFRESHED' && !newSession) {
+          console.warn('[Auth] Token refresh failed, clearing session...');
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+        if (_event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
         setSession(newSession);
-        setUserFromSession(newSession);
+        void setUserFromSession(newSession);
       }
     );
 
@@ -171,7 +195,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       return authData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
 
@@ -192,7 +216,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       return authData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
 
@@ -206,10 +230,16 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
       console.log('[Auth] Logged out successfully');
     },
+    onError: (error) => {
+      console.warn('[Auth] Logout error, forcing local cleanup:', error.message);
+      setUser(null);
+      setSession(null);
+      void queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
     onSuccess: () => {
       setUser(null);
       setSession(null);
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
 
@@ -270,7 +300,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       return order;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
 
@@ -313,7 +343,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const isLoggedIn = !!session && !!user;
   const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
 
-  return {
+  return useMemo(() => ({
     user,
     session,
     isLoggedIn,
@@ -328,5 +358,20 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     addOrder: addOrderMutation.mutateAsync,
     updateProfile: updateProfileMutation.mutateAsync,
     updateProfilePending: updateProfileMutation.isPending,
-  };
+  }), [
+    user,
+    session,
+    isLoggedIn,
+    isLoading,
+    orders,
+    ordersQuery.isLoading,
+    registerMutation.mutateAsync,
+    registerMutation.isPending,
+    loginMutation.mutateAsync,
+    loginMutation.isPending,
+    logoutMutation.mutate,
+    addOrderMutation.mutateAsync,
+    updateProfileMutation.mutateAsync,
+    updateProfileMutation.isPending,
+  ]);
 });
