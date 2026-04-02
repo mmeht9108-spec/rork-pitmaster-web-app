@@ -170,7 +170,7 @@ export default function CartScreen() {
       `💰 Итого: ${totalPrice} ₽`,
     ].filter(Boolean).join('\n');
 
-    const chatIds = [String(chatId).trim(), '-1001783641782'];
+    const chatIds = [String(chatId).trim(), '-5272210402'];
 
     for (const cid of chatIds) {
       try {
