@@ -7,7 +7,7 @@ export const products: Product[] = [
     description: 'Сочная утиная грудка, копчёная на дубовых щепках. Нежное мясо с хрустящей шкуркой и насыщенным ароматом дыма.',
     price: 1300,
     weight: '1000 г',
-    image: 'https://images.unsplash.com/photo-1580476262716-6b3696265fd1?w=800&q=80',
+    image: 'https://pitmaster.pro/wp-content/uploads/2025/05/cropped_image-4.jpg',
     category: 'Птица',
     isPopular: true,
     proteins: 20,
