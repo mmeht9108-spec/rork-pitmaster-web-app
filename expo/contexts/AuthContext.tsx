@@ -62,20 +62,43 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     setIsLoading(false);
   }, [fetchProfile]);
 
+  const clearAuthStorage = useCallback(async () => {
+    console.log('[Auth] Clearing auth storage...');
+    const keys = await AsyncStorage.getAllKeys();
+    const authKeys = keys.filter(
+      (key) => key.startsWith('sb-') || key.includes('supabase') || key.includes('refresh')
+    );
+    if (authKeys.length > 0) {
+      await AsyncStorage.multiRemove(authKeys);
+      console.log('[Auth] Removed auth keys:', authKeys);
+    }
+  }, []);
+
+  const handleAuthError = useCallback(async (errorMessage: string) => {
+    if (
+      errorMessage.includes('Refresh Token') ||
+      errorMessage.includes('refresh_token') ||
+      errorMessage.includes('Invalid Refresh Token')
+    ) {
+      console.log('[Auth] Invalid refresh token detected, clearing storage and session...');
+      await clearAuthStorage();
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      setSession(null);
+      setUser(null);
+      setIsLoading(false);
+      return true;
+    }
+    return false;
+  }, [clearAuthStorage]);
+
   useEffect(() => {
     console.log('[Auth] Initializing Supabase auth listener...');
 
-    void supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
+    void supabase.auth.getSession().then(async ({ data: { session: currentSession }, error }) => {
       if (error) {
         console.warn('[Auth] getSession error:', error.message);
-        if (error.message.includes('Refresh Token') || error.message.includes('refresh_token')) {
-          console.log('[Auth] Invalid refresh token detected, clearing session...');
-          void supabase.auth.signOut().catch(() => {});
-          setSession(null);
-          setUser(null);
-          setIsLoading(false);
-          return;
-        }
+        const handled = await handleAuthError(error.message);
+        if (handled) return;
       }
       console.log('[Auth] Initial session:', currentSession ? 'found' : 'none');
       setSession(currentSession);
@@ -83,16 +106,18 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      async (_event, newSession) => {
         console.log('[Auth] Auth state changed:', _event);
         if (_event === 'TOKEN_REFRESHED' && !newSession) {
           console.warn('[Auth] Token refresh failed, clearing session...');
+          await clearAuthStorage();
           setSession(null);
           setUser(null);
           setIsLoading(false);
           return;
         }
         if (_event === 'SIGNED_OUT') {
+          await clearAuthStorage();
           setSession(null);
           setUser(null);
           setIsLoading(false);
@@ -106,7 +131,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [setUserFromSession]);
+  }, [setUserFromSession, handleAuthError, clearAuthStorage]);
 
   const ordersQuery = useQuery({
     queryKey: ['orders', user?.id],
