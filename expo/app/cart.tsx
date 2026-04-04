@@ -61,7 +61,6 @@ export default function CartScreen() {
   const [privacyAccepted, setPrivacyAccepted] = useState<boolean>(false);
   const [privacyError, setPrivacyError] = useState<string>('');
   const [errors, setErrors] = useState<{ name?: string; phone?: string; address?: string }>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const animateTransition = (toStep: 1 | 2) => {
     Animated.timing(fadeAnim, {
@@ -122,186 +121,174 @@ export default function CartScreen() {
     return hasName && hasPhone && hasAddress && privacyAccepted;
   };
 
-const handleCheckout = async () => {
-  // 👇 ЗАЩИТА ОТ ПОВТОРНЫХ НАЖАТИЙ
-  if (isSubmitting) {
-    console.log('Заказ уже оформляется, повторное нажатие игнорируется');
-    return;
-  }
-
-  if (!validateForm()) {
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    }
-    return;
-  }
-
-  // 👇 БЛОКИРУЕМ КНОПКУ
-  setIsSubmitting(true);
-
-  const botToken = process.env.EXPO_PUBLIC_TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.EXPO_PUBLIC_TELEGRAM_CHAT_ID;
-
-  console.log('Starting order submission...');
-  console.log('Bot token exists:', !!botToken);
-  console.log('Chat ID:', chatId);
-
-  if (!botToken || !chatId) {
-    console.error('Missing Telegram credentials');
-    Alert.alert(
-      'Ошибка конфигурации',
-      'Отсутствуют данные для отправки заказа. Обратитесь к администратору.'
-    );
-    setIsSubmitting(false); // 👈 РАЗБЛОКИРУЕМ ПРИ ОШИБКЕ
-    return;
-  }
-
-  const orderLines = sanitizedItems
-    .map((item) => {
-      const baseWeightGrams = parseWeightGrams(item.product.weight);
-      const subtotal = getSubtotal(item.product.price, baseWeightGrams, item.quantity);
-      return `• ${item.product.name} ${formatGrams(item.quantity)} — ${subtotal} ₽`;
-    })
-    .join('\n');
-
-  const deliveryLabel = deliveryMethod === 'pickup' ? '🏪 Самовывоз' : '🚚 Доставка';
-
-  const message = [
-    '🔥 Новый заказ!',
-    '',
-    `👤 Имя: ${name.trim()}`,
-    `📞 Телефон: ${phone.trim()}`,
-    `${deliveryLabel}`,
-    deliveryMethod === 'delivery' && address.trim() ? `📍 Адрес: ${address.trim()}` : '',
-    comment.trim() ? `💬 Комментарий: ${comment.trim()}` : '',
-    '',
-    '📦 Заказ:',
-    orderLines,
-    '',
-    `💰 Итого: ${totalPrice} ₽`,
-  ].filter(Boolean).join('\n');
-
-  const chatIds = [String(chatId).trim(), '-5272210402'];
-
-  for (const cid of chatIds) {
-    try {
-      console.log(`Sending to Telegram chat ${cid}...`);
-
-      const telegramResponse = await fetch(
-        `https://api.telegram.org/bot${botToken}/sendMessage`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: cid,
-            text: message,
-            parse_mode: 'HTML',
-          }),
-        }
-      );
-
-      console.log(`Telegram response status for ${cid}:`, telegramResponse.status);
-
-      const telegramData = await telegramResponse.json();
-      console.log(`Telegram response data for ${cid}:`, JSON.stringify(telegramData));
-
-      if (!telegramResponse.ok || !telegramData.ok) {
-        console.warn(`Telegram send failed for ${cid}:`, telegramData?.description);
-      } else {
-        console.log(`Telegram message sent successfully to ${cid}!`);
+  const handleCheckout = async () => {
+    if (!validateForm()) {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-    } catch (telegramError) {
-      console.warn(`Telegram send error for ${cid}:`, telegramError);
+      return;
     }
-  }
 
-  try {
-    const emailBody = [
-      '<h2>🔥 Новый заказ!</h2>',
-      `<p><strong>👤 Имя:</strong> ${name.trim()}</p>`,
-      `<p><strong>📞 Телефон:</strong> ${phone.trim()}</p>`,
-      `<p><strong>${deliveryLabel}</strong></p>`,
-      deliveryMethod === 'delivery' && address.trim() ? `<p><strong>📍 Адрес:</strong> ${address.trim()}</p>` : '',
-      comment.trim() ? `<p><strong>💬 Комментарий:</strong> ${comment.trim()}</p>` : '',
-      '<h3>📦 Заказ:</h3>',
-      '<ul>',
-      ...sanitizedItems.map((item) => {
+    const botToken = process.env.EXPO_PUBLIC_TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.EXPO_PUBLIC_TELEGRAM_CHAT_ID;
+
+    console.log('Starting order submission...');
+    console.log('Bot token exists:', !!botToken);
+    console.log('Chat ID:', chatId);
+
+    if (!botToken || !chatId) {
+      console.error('Missing Telegram credentials');
+      Alert.alert(
+        'Ошибка конфигурации',
+        'Отсутствуют данные для отправки заказа. Обратитесь к администратору.'
+      );
+      return;
+    }
+
+    const orderLines = sanitizedItems
+      .map((item) => {
         const baseWeightGrams = parseWeightGrams(item.product.weight);
         const subtotal = getSubtotal(item.product.price, baseWeightGrams, item.quantity);
-        return `<li>${item.product.name} ${formatGrams(item.quantity)} — ${subtotal} ₽</li>`;
-      }),
-      '</ul>',
-      `<p><strong>💰 Итого: ${totalPrice} ₽</strong></p>`,
+        return `• ${item.product.name} ${formatGrams(item.quantity)} — ${subtotal} ₽`;
+      })
+      .join('\n');
+
+    const deliveryLabel = deliveryMethod === 'pickup' ? '🏪 Самовывоз' : '🚚 Доставка';
+
+    const message = [
+      '🔥 Новый заказ!',
+      '',
+      `👤 Имя: ${name.trim()}`,
+      `📞 Телефон: ${phone.trim()}`,
+      `${deliveryLabel}`,
+      deliveryMethod === 'delivery' && address.trim() ? `📍 Адрес: ${address.trim()}` : '',
+      comment.trim() ? `💬 Комментарий: ${comment.trim()}` : '',
+      '',
+      '📦 Заказ:',
+      orderLines,
+      '',
+      `💰 Итого: ${totalPrice} ₽`,
     ].filter(Boolean).join('\n');
 
-    console.log('Sending email notification...');
-    const emailResponse = await fetch('https://formsubmit.co/ajax/meht-91@yandex.ru', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        name: name.trim(),
-        phone: phone.trim(),
-        email: 'не указан',
-        message: emailBody,
-        _subject: `Новый заказ от ${name.trim()}`,
-        _template: 'table',
-      }),
-    });
+    const chatIds = [String(chatId).trim(), '-5272210402'];
 
-    const emailData = await emailResponse.json();
-    console.log('Email response:', emailData);
-  } catch (emailError) {
-    console.warn('Email send error (non-critical):', emailError);
-  }
+    for (const cid of chatIds) {
+      try {
+        console.log(`Sending to Telegram chat ${cid}...`);
 
-  if (isLoggedIn) {
-    try {
-      await addOrder({
-        items: sanitizedItems,
-        totalPrice,
-        deliveryMethod,
-        address: deliveryMethod === 'delivery' ? address.trim() : undefined,
-        comment: comment.trim() || undefined,
-        userName: name.trim(),
-        userPhone: phone.replace(/[\s\-\(\)]/g, ''),
-      });
-      console.log('Order saved to history');
-    } catch (orderErr) {
-      console.warn('Failed to save order to history:', orderErr);
+        const telegramResponse = await fetch(
+          `https://api.telegram.org/bot${botToken}/sendMessage`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: cid,
+              text: message,
+              parse_mode: 'HTML',
+            }),
+          }
+        );
+
+        console.log(`Telegram response status for ${cid}:`, telegramResponse.status);
+
+        const telegramData = await telegramResponse.json();
+        console.log(`Telegram response data for ${cid}:`, JSON.stringify(telegramData));
+
+        if (!telegramResponse.ok || !telegramData.ok) {
+          console.warn(`Telegram send failed for ${cid}:`, telegramData?.description);
+        } else {
+          console.log(`Telegram message sent successfully to ${cid}!`);
+        }
+      } catch (telegramError) {
+        console.warn(`Telegram send error for ${cid}:`, telegramError);
+      }
     }
-  }
 
-  if (Platform.OS !== 'web') {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }
-  
-  Alert.alert(
-    'Заказ оформлен',
-    'Спасибо за заказ! Мы свяжемся с вами для подтверждения.',
-    [
-      {
-        text: 'OK',
-        onPress: () => {
-          clearCart();
-          setName('');
-          setPhone('');
-          setAddress('');
-          setComment('');
-          setDeliveryMethod('pickup');
-          setPrivacyAccepted(false);
-          setPrivacyError('');
-          setErrors({});
-          setStep(1);
-          setIsSubmitting(false); // 👈 РАЗБЛОКИРУЕМ ПОСЛЕ ОЧИСТКИ
-          router.back();
+    try {
+      const emailBody = [
+        '<h2>🔥 Новый заказ!</h2>',
+        `<p><strong>👤 Имя:</strong> ${name.trim()}</p>`,
+        `<p><strong>📞 Телефон:</strong> ${phone.trim()}</p>`,
+        `<p><strong>${deliveryLabel}</strong></p>`,
+        deliveryMethod === 'delivery' && address.trim() ? `<p><strong>📍 Адрес:</strong> ${address.trim()}</p>` : '',
+        comment.trim() ? `<p><strong>💬 Комментарий:</strong> ${comment.trim()}</p>` : '',
+        '<h3>📦 Заказ:</h3>',
+        '<ul>',
+        ...sanitizedItems.map((item) => {
+          const baseWeightGrams = parseWeightGrams(item.product.weight);
+          const subtotal = getSubtotal(item.product.price, baseWeightGrams, item.quantity);
+          return `<li>${item.product.name} ${formatGrams(item.quantity)} — ${subtotal} ₽</li>`;
+        }),
+        '</ul>',
+        `<p><strong>💰 Итого: ${totalPrice} ₽</strong></p>`,
+      ].filter(Boolean).join('\n');
+
+      console.log('Sending email notification...');
+      const emailResponse = await fetch('https://formsubmit.co/ajax/meht-91@yandex.ru', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-      },
-    ]
-  );
-};
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          email: 'не указан',
+          message: emailBody,
+          _subject: `Новый заказ от ${name.trim()}`,
+          _template: 'table',
+        }),
+      });
+
+      const emailData = await emailResponse.json();
+      console.log('Email response:', emailData);
+    } catch (emailError) {
+      console.warn('Email send error (non-critical):', emailError);
+    }
+
+    if (isLoggedIn) {
+      try {
+        await addOrder({
+          items: sanitizedItems,
+          totalPrice,
+          deliveryMethod,
+          address: deliveryMethod === 'delivery' ? address.trim() : undefined,
+          comment: comment.trim() || undefined,
+          userName: name.trim(),
+          userPhone: phone.replace(/[\s\-\(\)]/g, ''),
+        });
+        console.log('Order saved to history');
+      } catch (orderErr) {
+        console.warn('Failed to save order to history:', orderErr);
+      }
+    }
+
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    Alert.alert(
+      'Заказ оформлен',
+      'Спасибо за заказ! Мы свяжемся с вами для подтверждения.',
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            clearCart();
+            setName('');
+            setPhone('');
+            setAddress('');
+            setComment('');
+            setDeliveryMethod('pickup');
+            setPrivacyAccepted(false);
+            setPrivacyError('');
+            setErrors({});
+            setStep(1);
+            router.back();
+          },
+        },
+      ]
+    );
+  };
 
   if (items.length === 0) {
     return (
