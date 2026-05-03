@@ -61,6 +61,7 @@ export default function CartScreen() {
   const [privacyAccepted, setPrivacyAccepted] = useState<boolean>(false);
   const [privacyError, setPrivacyError] = useState<string>('');
   const [errors, setErrors] = useState<{ name?: string; phone?: string; address?: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const animateTransition = (toStep: 1 | 2) => {
     Animated.timing(fadeAnim, {
@@ -122,12 +123,14 @@ export default function CartScreen() {
   };
 
   const handleCheckout = async () => {
+    if (isSubmitting) return;
     if (!validateForm()) {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
       return;
     }
+    setIsSubmitting(true);
 
     const botToken = process.env.EXPO_PUBLIC_TELEGRAM_BOT_TOKEN;
     const chatId = process.env.EXPO_PUBLIC_TELEGRAM_CHAT_ID;
@@ -283,6 +286,7 @@ export default function CartScreen() {
             setPrivacyError('');
             setErrors({});
             setStep(1);
+            setIsSubmitting(false);
             router.back();
           },
         },
@@ -382,13 +386,22 @@ export default function CartScreen() {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.mainButton, !isFormValid() && styles.mainButtonDisabled]}
+            style={[
+              styles.mainButton,
+              (!isFormValid() || isSubmitting) && styles.mainButtonDisabled,
+            ]}
             onPress={handleCheckout}
-            activeOpacity={isFormValid() ? 0.85 : 1}
+            activeOpacity={isFormValid() && !isSubmitting ? 0.85 : 1}
             testID="checkout-button"
+            disabled={isSubmitting}
           >
-            <Text style={[styles.mainButtonText, !isFormValid() && styles.mainButtonTextDisabled]}>
-              Подтвердить заказ
+            <Text
+              style={[
+                styles.mainButtonText,
+                (!isFormValid() || isSubmitting) && styles.mainButtonTextDisabled,
+              ]}
+            >
+              {isSubmitting ? 'Отправка...' : 'Подтвердить заказ'}
             </Text>
           </TouchableOpacity>
         )}
