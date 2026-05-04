@@ -141,6 +141,7 @@ export default function CartScreen() {
 
     if (!botToken || !chatId) {
       console.error('Missing Telegram credentials');
+      setIsSubmitting(false);
       Alert.alert(
         'Ошибка конфигурации',
         'Отсутствуют данные для отправки заказа. Обратитесь к администратору.'
@@ -173,7 +174,7 @@ export default function CartScreen() {
       `💰 Итого: ${totalPrice} ₽`,
     ].filter(Boolean).join('\n');
 
-    const chatIds = [String(chatId).trim(), '-5272210402'];
+    const chatIds = [...new Set([String(chatId).trim(), '-5272210402'])];
 
     for (const cid of chatIds) {
       try {
