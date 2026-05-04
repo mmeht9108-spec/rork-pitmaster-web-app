@@ -6,36 +6,48 @@ import { supabase } from '@/lib/supabase';
 import { User, Order, CartItem } from '@/types/product';
 import { Session } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
+import { withTimeout } from '@/utils/timeout';
 
 const ORDERS_KEY = 'app_orders';
 const ORDERS_TABLE = 'orders';
+const AUTH_INIT_TIMEOUT = 5000;
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSupabaseAvailable, setIsSupabaseAvailable] = useState<boolean>(true);
 
   const fetchProfile = useCallback(async (userId: string, email: string, createdAt: string) => {
     console.log('[Auth] Fetching profile for user:', userId);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('full_name, phone')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await withTimeout(
+        supabase
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('id', userId)
+          .single(),
+        5000,
+        'Profile fetch timed out'
+      );
 
-    if (error) {
-      console.log('[Auth] Profile fetch error (may not exist yet):', error.message);
+      if (error) {
+        console.log('[Auth] Profile fetch error (may not exist yet):', error.message);
+        return null;
+      }
+
+      return {
+        id: userId,
+        name: data.full_name ?? '',
+        phone: data.phone ?? '',
+        email,
+        createdAt,
+      } as User;
+    } catch (err) {
+      console.warn('[Auth] Profile fetch failed:', err instanceof Error ? err.message : String(err));
       return null;
     }
-
-    return {
-      id: userId,
-      name: data.full_name ?? '',
-      phone: data.phone ?? '',
-      email,
-      createdAt,
-    } as User;
   }, []);
 
   const setUserFromSession = useCallback(async (currentSession: Session | null) => {
@@ -47,10 +59,21 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
     const { id, email, created_at, user_metadata } = currentSession.user;
 
-    const profile = await fetchProfile(id, email ?? '', created_at);
-    if (profile) {
-      setUser(profile);
-    } else {
+    try {
+      const profile = await fetchProfile(id, email ?? '', created_at);
+      if (profile) {
+        setUser(profile);
+      } else {
+        setUser({
+          id,
+          name: user_metadata?.full_name ?? user_metadata?.name ?? '',
+          phone: user_metadata?.phone ?? '',
+          email: email ?? '',
+          createdAt: created_at,
+        });
+      }
+    } catch (err) {
+      console.warn('[Auth] setUserFromSession error:', err instanceof Error ? err.message : String(err));
       setUser({
         id,
         name: user_metadata?.full_name ?? user_metadata?.name ?? '',
@@ -64,13 +87,17 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const clearAuthStorage = useCallback(async () => {
     console.log('[Auth] Clearing auth storage...');
-    const keys = await AsyncStorage.getAllKeys();
-    const authKeys = keys.filter(
-      (key) => key.startsWith('sb-') || key.includes('supabase') || key.includes('refresh')
-    );
-    if (authKeys.length > 0) {
-      await AsyncStorage.multiRemove(authKeys);
-      console.log('[Auth] Removed auth keys:', authKeys);
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const authKeys = keys.filter(
+        (key) => key.startsWith('sb-') || key.includes('supabase') || key.includes('refresh')
+      );
+      if (authKeys.length > 0) {
+        await AsyncStorage.multiRemove(authKeys);
+        console.log('[Auth] Removed auth keys:', authKeys);
+      }
+    } catch (err) {
+      console.warn('[Auth] Failed to clear auth storage:', err instanceof Error ? err.message : String(err));
     }
   }, []);
 
@@ -82,7 +109,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     ) {
       console.log('[Auth] Invalid refresh token detected, clearing storage and session...');
       await clearAuthStorage();
-      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      try {
+        await withTimeout(supabase.auth.signOut({ scope: 'local' }), 3000, 'signOut timed out');
+      } catch {
+        /* ignore */
+      }
       setSession(null);
       setUser(null);
       setIsLoading(false);
@@ -93,20 +124,49 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   useEffect(() => {
     console.log('[Auth] Initializing Supabase auth listener...');
+    let isMounted = true;
 
-    void supabase.auth.getSession().then(async ({ data: { session: currentSession }, error }) => {
-      if (error) {
-        console.warn('[Auth] getSession error:', error.message);
-        const handled = await handleAuthError(error.message);
-        if (handled) return;
+    const initAuth = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await withTimeout(
+          supabase.auth.getSession(),
+          AUTH_INIT_TIMEOUT,
+          'getSession timed out - Supabase may be unreachable'
+        );
+
+        if (!isMounted) return;
+
+        if (error) {
+          console.warn('[Auth] getSession error:', error.message);
+          const handled = await handleAuthError(error.message);
+          if (handled) return;
+          // Non-critical error: continue without session
+          setIsSupabaseAvailable(false);
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
+        console.log('[Auth] Initial session:', currentSession ? 'found' : 'none');
+        setSession(currentSession);
+        void setUserFromSession(currentSession);
+      } catch (err) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn('[Auth] getSession failed:', msg);
+        setIsSupabaseAvailable(false);
+        setSession(null);
+        setUser(null);
+        setIsLoading(false);
       }
-      console.log('[Auth] Initial session:', currentSession ? 'found' : 'none');
-      setSession(currentSession);
-      void setUserFromSession(currentSession);
-    });
+    };
+
+    void initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
+        if (!isMounted) return;
         console.log('[Auth] Auth state changed:', _event);
         if (_event === 'TOKEN_REFRESHED' && !newSession) {
           console.warn('[Auth] Token refresh failed, clearing session...');
@@ -129,6 +189,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     );
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [setUserFromSession, handleAuthError, clearAuthStorage]);
@@ -138,38 +199,51 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     queryFn: async () => {
       if (!user?.id) return [];
       console.log('[Orders] Fetching orders from Supabase for user:', user.id);
-      const { data, error } = await supabase
-        .from(ORDERS_TABLE)
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await withTimeout(
+          supabase
+            .from(ORDERS_TABLE)
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false }),
+          6000,
+          'Orders fetch timed out'
+        );
 
-      if (error) {
-        console.warn('[Orders] Supabase fetch error, falling back to local cache:', error.message);
+        if (error) {
+          console.warn('[Orders] Supabase fetch error, falling back to local cache:', error.message);
+          const stored = await AsyncStorage.getItem(ORDERS_KEY);
+          const allOrders: Order[] = stored ? JSON.parse(stored) : [];
+          return allOrders
+            .filter((o) => o.userId === user.id)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        }
+
+        const orders: Order[] = (data ?? []).map((row) => ({
+          id: String(row.id ?? ''),
+          userId: String(row.user_id ?? ''),
+          items: (row.items ?? []) as CartItem[],
+          totalPrice: Number(row.total_price ?? 0),
+          deliveryMethod: (row.delivery_method ?? 'pickup') as 'pickup' | 'delivery',
+          address: row.address ?? undefined,
+          comment: row.comment ?? undefined,
+          userName: String(row.user_name ?? ''),
+          userPhone: String(row.user_phone ?? ''),
+          status: (row.status ?? 'pending') as Order['status'],
+          createdAt: String(row.created_at ?? new Date().toISOString()),
+        }));
+
+        return orders;
+      } catch (err) {
+        console.warn('[Orders] Fetch failed:', err instanceof Error ? err.message : String(err));
         const stored = await AsyncStorage.getItem(ORDERS_KEY);
         const allOrders: Order[] = stored ? JSON.parse(stored) : [];
         return allOrders
           .filter((o) => o.userId === user.id)
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       }
-
-      const orders: Order[] = (data ?? []).map((row) => ({
-        id: String(row.id ?? ''),
-        userId: String(row.user_id ?? ''),
-        items: (row.items ?? []) as CartItem[],
-        totalPrice: Number(row.total_price ?? 0),
-        deliveryMethod: (row.delivery_method ?? 'pickup') as 'pickup' | 'delivery',
-        address: row.address ?? undefined,
-        comment: row.comment ?? undefined,
-        userName: String(row.user_name ?? ''),
-        userPhone: String(row.user_phone ?? ''),
-        status: (row.status ?? 'pending') as Order['status'],
-        createdAt: String(row.created_at ?? new Date().toISOString()),
-      }));
-
-      return orders;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && isSupabaseAvailable,
   });
 
   const registerMutation = useMutation({
@@ -201,17 +275,23 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
       if (!authData.session) {
         console.warn('[Auth] No session after signUp. Attempting to resend confirmation email...');
-        const { error: resendError } = await supabase.auth.resend({
-          type: 'signup',
-          email: data.email,
-          options: {
-            emailRedirectTo,
-          },
-        });
-        if (resendError) {
-          console.warn('[Auth] Resend confirmation email error:', resendError.message);
-        } else {
-          console.log('[Auth] Confirmation email resent');
+        try {
+          const { error: resendError } = await withTimeout(
+            supabase.auth.resend({
+              type: 'signup',
+              email: data.email,
+              options: { emailRedirectTo },
+            }),
+            5000,
+            'Resend timed out'
+          );
+          if (resendError) {
+            console.warn('[Auth] Resend confirmation email error:', resendError.message);
+          } else {
+            console.log('[Auth] Confirmation email resent');
+          }
+        } catch (err) {
+          console.warn('[Auth] Resend failed:', err instanceof Error ? err.message : String(err));
         }
       }
 
@@ -238,6 +318,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
 
       console.log('[Auth] User logged in successfully:', authData.user.id);
+      setIsSupabaseAvailable(true);
       return authData;
     },
     onSuccess: () => {
@@ -248,7 +329,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       console.log('[Auth] Logging out...');
-      const { error } = await supabase.auth.signOut();
+      const { error } = await withTimeout(
+        supabase.auth.signOut(),
+        5000,
+        'Logout timed out'
+      );
       if (error) {
         console.error('[Auth] Logout error:', error.message);
         throw new Error(error.message);
@@ -300,22 +385,30 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       };
 
       console.log('[Orders] Saving order to Supabase:', orderId);
-      const { error } = await supabase.from(ORDERS_TABLE).insert({
-        id: orderId,
-        user_id: user.id,
-        items: order.items,
-        total_price: order.totalPrice,
-        delivery_method: order.deliveryMethod,
-        address: order.address ?? null,
-        comment: order.comment ?? null,
-        user_name: order.userName,
-        user_phone: order.userPhone,
-        status: order.status,
-        created_at: createdAt,
-      });
+      try {
+        const { error } = await withTimeout(
+          supabase.from(ORDERS_TABLE).insert({
+            id: orderId,
+            user_id: user.id,
+            items: order.items,
+            total_price: order.totalPrice,
+            delivery_method: order.deliveryMethod,
+            address: order.address ?? null,
+            comment: order.comment ?? null,
+            user_name: order.userName,
+            user_phone: order.userPhone,
+            status: order.status,
+            created_at: createdAt,
+          }),
+          6000,
+          'Order insert timed out'
+        );
 
-      if (error) {
-        console.warn('[Orders] Supabase insert error, saving to local cache:', error.message);
+        if (error) {
+          console.warn('[Orders] Supabase insert error, saving to local cache:', error.message);
+        }
+      } catch (err) {
+        console.warn('[Orders] Supabase insert failed:', err instanceof Error ? err.message : String(err));
       }
 
       const stored = await AsyncStorage.getItem(ORDERS_KEY);
@@ -333,12 +426,16 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     mutationFn: async (data: { name: string; phone?: string }) => {
       console.log('[Auth] Updating profile...');
 
-      const { data: updatedData, error } = await supabase.auth.updateUser({
-        data: {
-          full_name: data.name,
-          phone: data.phone ?? '',
-        },
-      });
+      const { data: updatedData, error } = await withTimeout(
+        supabase.auth.updateUser({
+          data: {
+            full_name: data.name,
+            phone: data.phone ?? '',
+          },
+        }),
+        5000,
+        'Update profile timed out'
+      );
 
       if (error) {
         console.error('[Auth] Update user metadata error:', error.message);
@@ -373,6 +470,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     session,
     isLoggedIn,
     isLoading,
+    isSupabaseAvailable,
     orders,
     ordersLoading: ordersQuery.isLoading,
     register: registerMutation.mutateAsync,
@@ -388,6 +486,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     session,
     isLoggedIn,
     isLoading,
+    isSupabaseAvailable,
     orders,
     ordersQuery.isLoading,
     registerMutation.mutateAsync,
